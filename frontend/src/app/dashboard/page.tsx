@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { CalorieRing } from "@/components/nutrition/CalorieRing";
+import { CalorieBarChart } from "@/components/nutrition/CalorieBarChart";
 import { useAuth } from "@/lib/auth";
 import { getDashboardSummary } from "@/lib/api";
 import type { DashboardSummaryResponse } from "@/lib/types";
-
-const DAY_LABEL = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
 export default function DashboardPage() {
   const { token, ready, isGuest } = useAuth();
@@ -37,10 +36,6 @@ export default function DashboardPage() {
     );
   }
 
-  const maxValue = summary
-    ? Math.max(summary.target, ...summary.days.map((d) => d.calories), 1)
-    : 1;
-
   return (
     <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8">
       <header>
@@ -58,24 +53,7 @@ export default function DashboardPage() {
 
           <Card className="p-5">
             <p className="mb-4 text-sm font-medium text-muted">Kalori per Hari</p>
-            <div className="flex h-40 items-end justify-between gap-2">
-              {summary.days.map((day) => {
-                const heightPct = Math.max((day.calories / maxValue) * 100, 2);
-                const isOver = day.calories > summary.target;
-                const dayOfWeek = new Date(`${day.date}T00:00:00`).getDay();
-                return (
-                  <div key={day.date} className="flex flex-1 flex-col items-center gap-2">
-                    <div className="flex h-32 w-full items-end">
-                      <div
-                        className={`w-full rounded-full ${isOver ? "bg-warning" : "bg-accent"}`}
-                        style={{ height: `${heightPct}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted">{DAY_LABEL[dayOfWeek]}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <CalorieBarChart days={summary.days} target={summary.target} />
           </Card>
         </>
       )}
