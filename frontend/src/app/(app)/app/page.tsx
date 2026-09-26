@@ -25,19 +25,19 @@ export default function HomePage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8 md:px-8 md:pb-12">
-      <header>
+      <header className="animate-fade-up">
         <p className="text-sm text-muted">Halo{user ? `, ${user.name.split(" ")[0]}` : ""}</p>
         <h1 className="text-2xl font-semibold tracking-tight">Mau makan apa hari ini?</h1>
       </header>
 
-      <Card className="p-6">
+      <Card className="animate-fade-up p-6 [animation-delay:80ms]">
         <p className="mb-4 text-sm font-medium text-muted">Ringkasan Kalori Hari Ini</p>
         <CalorieRing consumed={consumedToday} target={target} />
       </Card>
 
       <Link
         href="/scan"
-        className="group flex items-center justify-between rounded-card border border-border bg-accent px-6 py-5 text-accent-foreground transition active:scale-[0.98]"
+        className="group flex animate-fade-up items-center justify-between rounded-card border border-border bg-accent px-6 py-5 text-accent-foreground transition [animation-delay:160ms] hover:brightness-105 active:scale-[0.98]"
       >
         <div>
           <p className="text-xs font-medium uppercase tracking-wide opacity-80">Mulai</p>
@@ -49,7 +49,7 @@ export default function HomePage() {
       </Link>
 
       {ready && isGuest ? (
-        <Card className="flex items-center gap-3 p-4 text-sm text-muted">
+        <Card className="flex animate-fade-up items-center gap-3 p-4 text-sm text-muted [animation-delay:240ms]">
           <ForkKnife size={18} className="shrink-0 text-accent" />
           <p>
             Mode guest — riwayat tidak tersimpan.{" "}
@@ -60,7 +60,7 @@ export default function HomePage() {
           </p>
         </Card>
       ) : (
-        <Card className="flex items-center gap-3 p-4 text-sm text-muted">
+        <Card className="flex animate-fade-up items-center gap-3 p-4 text-sm text-muted [animation-delay:240ms]">
           <ForkKnife size={18} className="shrink-0 text-accent" />
           <p>
             {consumedToday > 0

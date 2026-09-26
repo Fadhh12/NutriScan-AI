@@ -49,15 +49,15 @@ export default function LandingPage() {
           />
           <div className="relative mx-auto grid w-full max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-center md:gap-16 md:px-8 md:py-24">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+              <h1 className="animate-fade-up text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
                 Foto makananmu. Kalorinya kelihatan sendiri.
               </h1>
-              <p className="mt-5 max-w-md text-base text-muted md:text-lg">
+              <p className="mt-5 max-w-md animate-fade-up text-base text-muted [animation-delay:100ms] md:text-lg">
                 NutriScan AI membaca foto makanan atau minumanmu dan langsung menghitung
                 estimasi kalori serta gizinya — tanpa cari manual di internet, tanpa input
                 satu-satu.
               </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-8 flex flex-wrap animate-fade-up items-center gap-3 [animation-delay:200ms]">
                 <Link
                   href="/scan"
                   className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition hover:brightness-105 active:scale-[0.98]"
@@ -78,7 +78,7 @@ export default function LandingPage() {
             </div>
 
             {/* Decorative product preview — mirrors the real ResultStep card */}
-            <div className="relative mx-auto w-full max-w-sm md:mx-0 md:justify-self-end">
+            <div className="relative mx-auto w-full max-w-sm animate-fade-up [animation-delay:150ms] md:mx-0 md:justify-self-end">
               <div className="rotate-2 rounded-card border border-border bg-surface p-5 shadow-[0_1px_2px_rgba(28,25,23,0.04),0_24px_48px_rgba(28,25,23,0.12)]">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">Terdeteksi</p>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Sate Ayam</h2>
