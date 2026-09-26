@@ -30,3 +30,14 @@ export const loginSchema = z.object({
   email: z.string().trim().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
+
+export const confirmScanSchema = z
+  .object({
+    confirmed: z.boolean().optional(),
+    rejected: z.boolean().optional(),
+    foodName: z.string().trim().min(1).optional(),
+    portionEstimateG: z.number().positive().optional(),
+  })
+  .refine((data) => data.confirmed || data.rejected || data.foodName, {
+    message: "Provide one of: confirmed, rejected, or foodName",
+  });

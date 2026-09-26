@@ -15,5 +15,6 @@ export const scanRateLimiter = rateLimit({
   limit: 1,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.auth?.sub ?? req.ip ?? "unknown",
   message: { success: false, error: { message: "Please wait a moment before scanning again" } },
 });

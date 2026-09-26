@@ -40,9 +40,10 @@ npm install
 npm run dev             # http://localhost:3000
 ```
 
-### Database
+### Database & Storage
 
-Jalankan migration `backend/supabase/migrations/0001_init.sql` di Supabase SQL editor project kamu.
+1. Jalankan migration `backend/supabase/migrations/0001_init.sql` di Supabase SQL editor project kamu.
+2. Buat Storage bucket bernama `scan-photos` (public), sesuai `SUPABASE_STORAGE_BUCKET` di `.env`.
 
 ## Progres Pengerjaan
 
@@ -52,7 +53,7 @@ Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dok
 | --- | --- |
 | Fase 0 — Setup | Selesai |
 | Fase 1 — Auth | Selesai |
-| Fase 2 — Core Scan | Belum |
+| Fase 2 — Core Scan | Selesai |
 | Fase 3 — Frontend Scan Flow | Belum |
 | Fase 4 — Log & Dashboard | Belum |
 | Fase 5 — Polish & Testing | Belum |
