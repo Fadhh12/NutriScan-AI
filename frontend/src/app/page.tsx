@@ -1,23 +1,39 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Camera, ForkKnife } from "@phosphor-icons/react/dist/ssr";
+import { Camera, ForkKnife } from "@phosphor-icons/react";
 import { Card } from "@/components/ui/Card";
 import { CalorieRing } from "@/components/nutrition/CalorieRing";
-
-const DAILY_CALORIE_TARGET = 2000;
+import { BottomNav } from "@/components/ui/BottomNav";
+import { useAuth } from "@/lib/auth";
+import { getDashboardSummary } from "@/lib/api";
 
 export default function HomePage() {
-  const consumedToday = 0;
+  const { token, user, ready, isGuest } = useAuth();
+  const [consumedToday, setConsumedToday] = useState(0);
+  const [target, setTarget] = useState(2000);
+
+  useEffect(() => {
+    if (!ready || !token) return;
+    getDashboardSummary(token)
+      .then((res) => {
+        setConsumedToday(res.today.calories);
+        setTarget(res.target);
+      })
+      .catch(() => {});
+  }, [ready, token]);
 
   return (
-    <main className="flex flex-1 flex-col gap-6 px-5 pb-10 pt-8">
+    <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8">
       <header>
-        <p className="text-sm text-muted">Halo,</p>
+        <p className="text-sm text-muted">Halo{user ? `, ${user.name.split(" ")[0]}` : ""}</p>
         <h1 className="text-2xl font-semibold tracking-tight">Mau makan apa hari ini?</h1>
       </header>
 
       <Card className="p-6">
         <p className="mb-4 text-sm font-medium text-muted">Ringkasan Kalori Hari Ini</p>
-        <CalorieRing consumed={consumedToday} target={DAILY_CALORIE_TARGET} />
+        <CalorieRing consumed={consumedToday} target={target} />
       </Card>
 
       <Link
@@ -33,10 +49,29 @@ export default function HomePage() {
         </span>
       </Link>
 
-      <Card className="flex items-center gap-3 p-4 text-sm text-muted">
-        <ForkKnife size={18} className="shrink-0 text-accent" />
-        <p>Belum ada makanan yang di-log hari ini. Scan foto makananmu untuk mulai tracking.</p>
-      </Card>
+      {ready && isGuest ? (
+        <Card className="flex items-center gap-3 p-4 text-sm text-muted">
+          <ForkKnife size={18} className="shrink-0 text-accent" />
+          <p>
+            Mode guest — riwayat tidak tersimpan.{" "}
+            <Link href="/login" className="font-medium text-accent underline">
+              Buat akun
+            </Link>{" "}
+            untuk simpan riwayat & lihat dashboard.
+          </p>
+        </Card>
+      ) : (
+        <Card className="flex items-center gap-3 p-4 text-sm text-muted">
+          <ForkKnife size={18} className="shrink-0 text-accent" />
+          <p>
+            {consumedToday > 0
+              ? "Terus lanjutkan tracking kalori harianmu."
+              : "Belum ada makanan yang di-log hari ini. Scan foto makananmu untuk mulai tracking."}
+          </p>
+        </Card>
+      )}
+
+      <BottomNav />
     </main>
   );
 }

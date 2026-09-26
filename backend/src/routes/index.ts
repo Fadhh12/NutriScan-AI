@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { authRoutes } from "./auth.routes";
 import { scanRoutes } from "./scan.routes";
+import { logRoutes } from "./log.routes";
+import { dashboardRoutes } from "./dashboard.routes";
+import { userRoutes } from "./user.routes";
 
 export const router = Router();
 
@@ -10,3 +13,6 @@ router.get("/health", (_req, res) => {
 
 router.use("/auth", authRoutes);
 router.use("/scan", scanRoutes);
+router.use("/logs", logRoutes);
+router.use("/dashboard", dashboardRoutes);
+router.use("/users", userRoutes);

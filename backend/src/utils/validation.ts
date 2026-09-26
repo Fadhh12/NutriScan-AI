@@ -31,13 +31,24 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const mealTypeSchema = z.enum(["breakfast", "lunch", "dinner", "snack"]);
+
 export const confirmScanSchema = z
   .object({
     confirmed: z.boolean().optional(),
     rejected: z.boolean().optional(),
     foodName: z.string().trim().min(1).optional(),
     portionEstimateG: z.number().positive().optional(),
+    mealType: mealTypeSchema.optional(),
   })
   .refine((data) => data.confirmed || data.rejected || data.foodName, {
     message: "Provide one of: confirmed, rejected, or foodName",
   });
+
+export const updateTargetSchema = z.object({
+  dailyCalorieTarget: z
+    .number()
+    .int()
+    .min(800, "Daily calorie target must be between 800 and 6000")
+    .max(6000, "Daily calorie target must be between 800 and 6000"),
+});

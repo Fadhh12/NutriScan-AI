@@ -31,6 +31,9 @@ npm install
 npm run dev             # http://localhost:4000
 ```
 
+> Belum punya Supabase project? Jalankan `cd supabase-docker && ./setup.sh` — stack Postgres +
+> PostgREST + Storage self-hosted via Docker, gratis, jalan lokal. Lihat [`supabase-docker/README.md`](supabase-docker/README.md).
+
 ### Frontend
 
 ```bash
@@ -42,8 +45,12 @@ npm run dev             # http://localhost:3000
 
 ### Database & Storage
 
+Kalau pakai Supabase Cloud:
+
 1. Jalankan migration `backend/supabase/migrations/0001_init.sql` di Supabase SQL editor project kamu.
 2. Buat Storage bucket bernama `scan-photos` (public), sesuai `SUPABASE_STORAGE_BUCKET` di `.env`.
+
+Kalau pakai `supabase-docker/setup.sh` (lokal), dua langkah di atas sudah otomatis dijalankan.
 
 ## Progres Pengerjaan
 
@@ -55,5 +62,5 @@ Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dok
 | Fase 1 — Auth | Selesai |
 | Fase 2 — Core Scan | Selesai |
 | Fase 3 — Frontend Scan Flow | Selesai |
-| Fase 4 — Log & Dashboard | Belum |
+| Fase 4 — Log & Dashboard | Selesai |
 | Fase 5 — Polish & Testing | Belum |

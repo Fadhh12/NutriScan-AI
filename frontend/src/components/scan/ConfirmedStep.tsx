@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useAuth } from "@/lib/auth";
 import type { Scan, ScanNutrition } from "@/lib/types";
 
 interface ConfirmedStepProps {
@@ -11,6 +14,8 @@ interface ConfirmedStepProps {
 }
 
 export function ConfirmedStep({ scan, nutrition, onScanAgain }: ConfirmedStepProps) {
+  const { token } = useAuth();
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-5 px-5 pb-10 pt-8 text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft text-accent">
@@ -31,6 +36,13 @@ export function ConfirmedStep({ scan, nutrition, onScanAgain }: ConfirmedStepPro
         <Button fullWidth onClick={onScanAgain}>
           Scan Lagi
         </Button>
+        {token && (
+          <Link href="/history">
+            <Button fullWidth variant="secondary">
+              Lihat Riwayat
+            </Button>
+          </Link>
+        )}
         <Link href="/">
           <Button fullWidth variant="secondary">
             Kembali ke Home

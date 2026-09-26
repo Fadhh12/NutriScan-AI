@@ -14,6 +14,8 @@ import {
   replaceScanNutrition,
   updateScanStatus,
 } from "../services/scan.service";
+import { createDailyLog, inferMealType } from "../services/log.service";
+import type { MealType } from "../models/types";
 
 async function assertValidImageDimensions(buffer: Buffer) {
   const metadata = await sharp(buffer).metadata();
@@ -92,17 +94,20 @@ export async function confirmScan(req: Request, res: Response) {
   const { scan } = await getScanWithNutrition(req.params.id);
   assertScanAccessible(scan, req.auth?.sub);
 
-  const { confirmed, rejected, foodName, portionEstimateG } = req.body as {
+  const { confirmed, rejected, foodName, portionEstimateG, mealType } = req.body as {
     confirmed?: boolean;
     rejected?: boolean;
     foodName?: string;
     portionEstimateG?: number;
+    mealType?: MealType;
   };
 
   if (rejected) {
     const updated = await updateScanStatus(scan.id, { status: "rejected" });
     return ok(res, { scan: updated, nutrition: null });
   }
+
+  const userId = req.auth?.sub;
 
   if (foodName) {
     const portion = portionEstimateG ?? scan.portion_estimate_g ?? 100;
@@ -114,12 +119,18 @@ export async function confirmScan(req: Request, res: Response) {
       portion_estimate_g: portion,
     });
     const savedNutrition = await replaceScanNutrition(scan.id, nutrition);
+    if (userId) {
+      await createDailyLog({ userId, scanId: scan.id, mealType: mealType ?? inferMealType() });
+    }
     return ok(res, { scan: updated, nutrition: savedNutrition });
   }
 
   if (confirmed) {
     const updated = await updateScanStatus(scan.id, { status: "confirmed" });
     const { nutrition } = await getScanWithNutrition(scan.id);
+    if (userId) {
+      await createDailyLog({ userId, scanId: scan.id, mealType: mealType ?? inferMealType() });
+    }
     return ok(res, { scan: updated, nutrition });
   }
 

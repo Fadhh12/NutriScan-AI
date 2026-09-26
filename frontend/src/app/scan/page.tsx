@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { confirmScan, submitScan } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { presentError } from "@/lib/errorMessages";
 import type { ConfirmScanResponse, ScanCandidate, ScanResponse } from "@/lib/types";
 import { CaptureStep } from "@/components/scan/CaptureStep";
@@ -14,6 +15,7 @@ import { ErrorStep } from "@/components/scan/ErrorStep";
 type Step = "capture" | "loading" | "result" | "correction" | "confirmed" | "error";
 
 export default function ScanPage() {
+  const { token } = useAuth();
   const [step, setStep] = useState<Step>("capture");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export default function ScanPage() {
   async function runScan(selectedFile: File) {
     setStep("loading");
     try {
-      const result = await submitScan(selectedFile);
+      const result = await submitScan(selectedFile, token);
       setScanResult(result);
       setStep(result.lowConfidence ? "correction" : "result");
     } catch (err) {
@@ -54,7 +56,7 @@ export default function ScanPage() {
     if (!scanResult) return;
     setIsSubmitting(true);
     try {
-      const result = await confirmScan(scanResult.scan.id, { confirmed: true });
+      const result = await confirmScan(scanResult.scan.id, { confirmed: true }, token);
       setConfirmed(result);
       setStep("confirmed");
     } catch (err) {
@@ -69,10 +71,11 @@ export default function ScanPage() {
     if (!scanResult) return;
     setIsSubmitting(true);
     try {
-      const result = await confirmScan(scanResult.scan.id, {
-        foodName: candidate.name,
-        portionEstimateG: candidate.portionEstimateG,
-      });
+      const result = await confirmScan(
+        scanResult.scan.id,
+        { foodName: candidate.name, portionEstimateG: candidate.portionEstimateG },
+        token,
+      );
       setConfirmed(result);
       setStep("confirmed");
     } catch (err) {
@@ -87,7 +90,7 @@ export default function ScanPage() {
     if (!scanResult) return;
     setIsSubmitting(true);
     try {
-      const result = await confirmScan(scanResult.scan.id, { foodName, portionEstimateG });
+      const result = await confirmScan(scanResult.scan.id, { foodName, portionEstimateG }, token);
       setConfirmed(result);
       setStep("confirmed");
     } catch (err) {
