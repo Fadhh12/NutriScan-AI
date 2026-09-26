@@ -30,8 +30,8 @@ export async function cleanupOldPhotos(): Promise<{ processed: number; failed: n
 }
 
 cleanupOldPhotos()
-  .then(({ processed, failed }) => {
-    process.exit(failed > 0 && processed === 0 ? 1 : 0);
+  .then(({ failed }) => {
+    process.exit(failed > 0 ? 1 : 0);
   })
   .catch((err) => {
     logger.error("Photo retention cleanup crashed", { err: String(err) });

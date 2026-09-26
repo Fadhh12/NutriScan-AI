@@ -49,8 +49,12 @@ export default function HistoryPage() {
 
   async function handleDelete(id: string) {
     if (!token) return;
-    await deleteLogEntry(id, token);
-    setLogs((prev) => prev.filter((log) => log.id !== id));
+    try {
+      await deleteLogEntry(id, token);
+      setLogs((prev) => prev.filter((log) => log.id !== id));
+    } catch (err) {
+      setError(presentError(err).message);
+    }
   }
 
   if (ready && isGuest) {
