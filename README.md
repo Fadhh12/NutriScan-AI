@@ -51,7 +51,7 @@ Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dok
 | Fase | Status |
 | --- | --- |
 | Fase 0 — Setup | Selesai |
-| Fase 1 — Auth | Belum |
+| Fase 1 — Auth | Selesai |
 | Fase 2 — Core Scan | Belum |
 | Fase 3 — Frontend Scan Flow | Belum |
 | Fase 4 — Log & Dashboard | Belum |
