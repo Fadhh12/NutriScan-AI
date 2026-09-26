@@ -73,6 +73,24 @@ npm run test:e2e     # smoke test: register -> scan -> confirm -> log -> dashboa
 
 Butuh DB yang hidup (Supabase Cloud atau `supabase-docker`), bukan mock — lihat [`docs/PHASE-5-POLISH-TESTING.md`](docs/PHASE-5-POLISH-TESTING.md).
 
+### Data Demo
+
+Biar History/Dashboard gak kosong pas pertama buka:
+
+```bash
+cd backend
+npm run seed:demo
+```
+
+Bikin (atau reset kalau udah ada) akun `demo@nutriscan.ai` / `demo12345` dengan riwayat scan 7 hari terakhir (makanan asli dari `src/data/foodDataset.ts`, foto placeholder warna solid — bukan foto makanan asli, cuma biar thumbnail-nya keisi). Aman dijalankan berkali-kali, nge-reset riwayat demo user itu doang.
+
+## AI Nutrition Insight
+
+Dashboard nampilin insight harian dari LLM berdasarkan data 7 hari terakhir (kalori vs target, rata-rata protein), di-cache sekali per hari per user (`ai_insights` table) biar gak nge-hit API tiap buka halaman.
+
+- `AI_INSIGHT_PROVIDER=mock` (default) — deterministik, jalan tanpa API key apapun.
+- `AI_INSIGHT_PROVIDER=gemini` + `GEMINI_API_KEY` (gratis di [aistudio.google.com](https://aistudio.google.com/app/apikey)) — insight beneran dari Gemini.
+
 ## Progres Pengerjaan
 
 Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dokumen PRD/SRS/SDD).
