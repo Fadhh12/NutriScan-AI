@@ -1,5 +1,6 @@
 import { supabase } from "../config/supabase";
 import { AppError } from "../utils/AppError";
+import { todayLocalDate } from "../utils/localTime";
 import type { DailyLog, MealType, Scan, ScanNutrition } from "../models/types";
 
 export interface DailyLogWithDetails extends DailyLog {
@@ -18,19 +19,11 @@ export interface DaySummary {
   logCount: number;
 }
 
-function todayLocalDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Default meal type by time of day, used when the client doesn't send one explicitly. */
-export function inferMealType(now: Date = new Date()): MealType {
-  const hour = now.getHours();
-  if (hour < 10) return "breakfast";
-  if (hour < 15) return "lunch";
-  if (hour < 21) return "dinner";
-  return "snack";
-}
-
+/**
+ * Idempotent by scan_id (unique constraint, migration 0003): a retried or
+ * double-tapped confirm re-writes the same row instead of creating a
+ * duplicate log that would double-count that meal's calories.
+ */
 export async function createDailyLog(input: {
   userId: string;
   scanId: string;
@@ -39,12 +32,15 @@ export async function createDailyLog(input: {
 }): Promise<DailyLog> {
   const { data, error } = await supabase
     .from("daily_logs")
-    .insert({
-      user_id: input.userId,
-      scan_id: input.scanId,
-      meal_type: input.mealType,
-      log_date: input.logDate ?? todayLocalDate(),
-    })
+    .upsert(
+      {
+        user_id: input.userId,
+        scan_id: input.scanId,
+        meal_type: input.mealType,
+        log_date: input.logDate ?? todayLocalDate(),
+      },
+      { onConflict: "scan_id" },
+    )
     .select()
     .single();
 

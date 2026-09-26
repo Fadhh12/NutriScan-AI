@@ -14,7 +14,8 @@ import {
   replaceScanNutrition,
   updateScanStatus,
 } from "../services/scan.service";
-import { createDailyLog, inferMealType } from "../services/log.service";
+import { createDailyLog } from "../services/log.service";
+import { inferMealType } from "../utils/localTime";
 import type { MealType } from "../models/types";
 
 async function assertValidImageDimensions(buffer: Buffer) {
