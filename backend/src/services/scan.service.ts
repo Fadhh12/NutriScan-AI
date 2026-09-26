@@ -105,6 +105,29 @@ export async function updateScanStatus(
   return data as Scan;
 }
 
+/** Scans past the photo retention window that still have a photo to clean up. */
+export async function listScansWithExpiredPhotos(olderThanDays: number): Promise<Scan[]> {
+  const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from("scans")
+    .select()
+    .not("image_url", "is", null)
+    .lt("created_at", cutoff);
+
+  if (error) {
+    throw new AppError(`Failed to list expired photos: ${error.message}`, 500);
+  }
+  return (data ?? []) as Scan[];
+}
+
+export async function clearScanPhoto(scanId: string): Promise<void> {
+  const { error } = await supabase.from("scans").update({ image_url: null }).eq("id", scanId);
+  if (error) {
+    throw new AppError(`Failed to clear photo url: ${error.message}`, 500);
+  }
+}
+
 export async function replaceScanNutrition(
   scanId: string,
   nutrition: NutritionBreakdown,

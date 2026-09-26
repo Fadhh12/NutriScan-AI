@@ -44,6 +44,9 @@ Perlu `SUPABASE_URL` & `SUPABASE_SERVICE_ROLE_KEY` (project asli + bucket storag
 
 ## Belum Dikerjakan
 
-- Penulisan ke `daily_logs` saat confirm — Fase 4.
-- Job pembersihan foto lama (retensi 30 hari) — Fase 5.
 - Verifikasi nyata provider LogMeal dengan API key asli.
+
+## Update
+
+- Penulisan ke `daily_logs` saat confirm — selesai di Fase 4.
+- Job pembersihan foto lama (retensi 30 hari, SRS 2.3) — selesai, lihat `src/jobs/cleanupOldPhotos.ts` (`npm run cleanup:photos`). Migration `0002_photo_retention.sql` bikin `scans.image_url` nullable supaya baris scan/nutrisi tetap ada setelah foto dihapus. Dites manual: scan → backdate `created_at` 40 hari → jalanin job → foto ke-hapus dari Storage, `image_url` jadi `null`, `detected_food_name`+nutrisi tetap utuh. Job idempotent (run ulang = 0 diproses). Belum ada scheduler otomatis (cron) — perlu dipasang manual di hosting saat deploy (Fase 5), lihat catatan di README.

@@ -47,10 +47,21 @@ npm run dev             # http://localhost:3000
 
 Kalau pakai Supabase Cloud:
 
-1. Jalankan migration `backend/supabase/migrations/0001_init.sql` di Supabase SQL editor project kamu.
+1. Jalankan migration `backend/supabase/migrations/0001_init.sql` lalu `0002_photo_retention.sql` (urut) di Supabase SQL editor project kamu.
 2. Buat Storage bucket bernama `scan-photos` (public), sesuai `SUPABASE_STORAGE_BUCKET` di `.env`.
 
-Kalau pakai `supabase-docker/setup.sh` (lokal), dua langkah di atas sudah otomatis dijalankan.
+Kalau pakai `supabase-docker/setup.sh` (lokal), migration `0001` + langkah bucket sudah otomatis. Migration `0002` perlu dijalankan manual sekali (`docker exec -i <db-container> psql -U postgres -d postgres < backend/supabase/migrations/0002_photo_retention.sql`) kalau volume dibuat sebelum migration ini ada.
+
+### Retensi Foto (SRS 2.3)
+
+Foto scan gak disimpan permanen lebih dari 30 hari (`PHOTO_RETENTION_DAYS` di `.env`), cuma hasil analisis teksnya yang persist. Jalankan pembersihan manual:
+
+```bash
+cd backend
+npm run cleanup:photos
+```
+
+Di production, jadwalkan ini lewat cron job hosting (Render Cron Job, Railway Cron, GitHub Actions scheduled workflow, dll) — misal tiap hari sekali. Belum diotomatisasi di repo ini karena belum ada target deploy yang fix.
 
 ## Progres Pengerjaan
 

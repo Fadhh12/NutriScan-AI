@@ -3,7 +3,7 @@ export type ScanStatus = "pending" | "confirmed" | "rejected";
 export interface Scan {
   id: string;
   user_id: string | null;
-  image_url: string;
+  image_url: string | null;
   detected_food_name: string | null;
   confidence_score: number | null;
   portion_estimate_g: number | null;
@@ -72,7 +72,7 @@ export interface LogEntry {
   created_at: string;
   scan: {
     id: string;
-    image_url: string;
+    image_url: string | null;
     detected_food_name: string | null;
     portion_estimate_g: number | null;
   } | null;
