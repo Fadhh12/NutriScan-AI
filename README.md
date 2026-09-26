@@ -63,6 +63,16 @@ npm run cleanup:photos
 
 Di production, jadwalkan ini lewat cron job hosting (Render Cron Job, Railway Cron, GitHub Actions scheduled workflow, dll) — misal tiap hari sekali. Belum diotomatisasi di repo ini karena belum ada target deploy yang fix.
 
+### Testing End-to-End
+
+```bash
+cd backend
+npm run dev          # di terminal lain, backend harus jalan dulu
+npm run test:e2e     # smoke test: register -> scan -> confirm -> log -> dashboard -> update target -> delete log
+```
+
+Butuh DB yang hidup (Supabase Cloud atau `supabase-docker`), bukan mock — lihat [`docs/PHASE-5-POLISH-TESTING.md`](docs/PHASE-5-POLISH-TESTING.md).
+
 ## Progres Pengerjaan
 
 Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dokumen PRD/SRS/SDD).
@@ -74,4 +84,4 @@ Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dok
 | Fase 2 — Core Scan | Selesai |
 | Fase 3 — Frontend Scan Flow | Selesai |
 | Fase 4 — Log & Dashboard | Selesai |
-| Fase 5 — Polish & Testing | Belum |
+| Fase 5 — Polish & Testing | Sebagian — testing e2e backend selesai, deploy & LogMeal asli nunggu kredensial |
