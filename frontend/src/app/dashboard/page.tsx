@@ -7,20 +7,28 @@ import { Card } from "@/components/ui/Card";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { CalorieRing } from "@/components/nutrition/CalorieRing";
 import { CalorieBarChart } from "@/components/nutrition/CalorieBarChart";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/lib/auth";
 import { getDashboardSummary } from "@/lib/api";
+import { presentError } from "@/lib/errorMessages";
 import type { DashboardSummaryResponse } from "@/lib/types";
 
 export default function DashboardPage() {
   const { token, ready, isGuest } = useAuth();
   const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready || !token) return;
-    getDashboardSummary(token)
-      .then(setSummary)
-      .finally(() => setIsLoading(false));
+    function load() {
+      setError(null);
+      getDashboardSummary(token!)
+        .then(setSummary)
+        .catch((err) => setError(presentError(err).message))
+        .finally(() => setIsLoading(false));
+    }
+    load();
   }, [ready, token]);
 
   if (ready && isGuest) {
@@ -43,9 +51,27 @@ export default function DashboardPage() {
         <p className="mt-1 text-sm text-muted">Ringkasan kalori 7 hari terakhir.</p>
       </header>
 
-      {isLoading && <p className="text-sm text-muted">Memuat...</p>}
+      {isLoading && (
+        <div className="flex flex-col gap-6" aria-live="polite" aria-label="Memuat dashboard">
+          <Card className="p-6">
+            <div className="flex items-center gap-5">
+              <Skeleton className="h-[132px] w-[132px] rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+          </Card>
+          <Card className="p-5">
+            <Skeleton className="mb-4 h-4 w-32" />
+            <Skeleton className="h-40 w-full" />
+          </Card>
+        </div>
+      )}
 
-      {summary && (
+      {!isLoading && error && <Card className="p-5 text-sm text-danger">{error}</Card>}
+
+      {!isLoading && summary && (
         <>
           <Card className="p-6">
             <CalorieRing consumed={summary.today.calories} target={summary.target} />

@@ -7,8 +7,10 @@ import { Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { BottomNav } from "@/components/ui/BottomNav";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/lib/auth";
 import { deleteLogEntry, getLogs } from "@/lib/api";
+import { presentError } from "@/lib/errorMessages";
 import type { LogEntry, MealType } from "@/lib/types";
 
 const MEAL_LABEL: Record<MealType, string> = {
@@ -27,14 +29,19 @@ export default function HistoryPage() {
   const [date, setDate] = useState(todayISO());
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready || !token) return;
     function load() {
       setIsLoading(true);
+      setError(null);
       getLogs(date, token!)
         .then((res) => setLogs(res.logs))
-        .catch(() => setLogs([]))
+        .catch((err) => {
+          setLogs([]);
+          setError(presentError(err).message);
+        })
         .finally(() => setIsLoading(false));
     }
     load();
@@ -76,14 +83,28 @@ export default function HistoryPage() {
         className="rounded-control border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
       />
 
-      {isLoading && <p className="text-sm text-muted">Memuat...</p>}
+      {isLoading && (
+        <div className="flex flex-col gap-3" aria-live="polite" aria-label="Memuat riwayat">
+          {[0, 1, 2].map((i) => (
+            <Card key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="h-14 w-14 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {!isLoading && logs.length === 0 && (
+      {!isLoading && error && <Card className="p-5 text-sm text-danger">{error}</Card>}
+
+      {!isLoading && !error && logs.length === 0 && (
         <Card className="p-5 text-sm text-muted">Belum ada makanan yang di-log tanggal ini.</Card>
       )}
 
       <div className="flex flex-col gap-3">
-        {logs.map((log) => (
+        {!isLoading && logs.map((log) => (
           <Card key={log.id} className="flex items-center gap-3 p-3">
             <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-control bg-surface-elevated">
               {log.scan?.image_url && (
