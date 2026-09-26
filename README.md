@@ -84,4 +84,4 @@ Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dok
 | Fase 2 — Core Scan | Selesai |
 | Fase 3 — Frontend Scan Flow | Selesai |
 | Fase 4 — Log & Dashboard | Selesai |
-| Fase 5 — Polish & Testing | Sebagian — testing e2e backend selesai, deploy & LogMeal asli nunggu kredensial |
+| Fase 5 — Polish & Testing | Selesai (deploy & LogMeal asli sengaja ditunda) |

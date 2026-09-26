@@ -1,6 +1,6 @@
 # Fase 5 — Polish & Testing
 
-Status: **Sebagian jalan** (testing end-to-end backend selesai; deploy & verifikasi visual browser masih ketahan blocker eksternal)
+Status: **Selesai untuk scope MVP** (deploy & LogMeal asli sengaja ditunda — keputusan user, bukan blocker)
 
 ## Yang Dikerjakan
 
@@ -19,9 +19,11 @@ Gak ada tool browser (Chrome extension / built-in browser) yang connect di sesi 
 
 **Belum diverifikasi:** tampilan visual sungguhan (proporsi layout, dark mode, crop foto kamera di device asli) — perlu dicek manual oleh yang punya akses browser/device, atau lewat sesi Claude Code yang punya Chrome extension / built-in browser aktif.
 
-## Belum Dikerjakan (blocker eksternal, butuh keputusan/kredensial user)
+## Sengaja Ditunda (keputusan user, 2026-09-26)
 
-- **Deploy backend + frontend** — perlu pilih hosting (Render/Railway/Fly untuk backend, Vercel untuk frontend, dst) dan kredensial akun. Belum dilakuin karena belum ada keputusan platform dari user.
-- **Verifikasi provider LogMeal asli** — perlu API key LogMeal (akun pihak ketiga). Backend masih pakai provider `mock` (deterministik, lihat Fase 2 doc).
+- **Deploy backend + frontend** — ditunda. App udah full jalan lokal (Docker Supabase + dev server), cukup buat demo/portofolio dulu. Kalau nanti mau deploy: backend butuh host yang support long-running Node process + cron (Render/Railway/Fly), frontend ke Vercel. Job retensi foto (`npm run cleanup:photos`) juga baru bisa dijadwalkan otomatis setelah ada host.
+- **Provider LogMeal asli** — ditunda, tetap pakai provider `mock` (deterministik, lihat Fase 2 doc). Sesuai rekomendasi PRD 6.4: validasi produk dulu sebelum invest ke API pihak ketiga berbayar. Tinggal set `FOOD_RECOGNITION_PROVIDER=logmeal` + `LOGMEAL_API_KEY` kapan pun mau aktifin, tanpa ubah struktur database (itu emang tujuan arsitektur ini dari awal).
+
+## Belum Dikerjakan
+
 - **Optimasi loading time & UX kecil** — belum digarap detail; kandidat: skeleton loading di History/Dashboard saat fetch, debounce input manual correction, dsb.
-- **Job retensi foto otomatis (cron)** — job-nya sendiri sudah selesai & teruji (Fase 2 doc bagian Update), tapi belum dijadwalkan otomatis karena belum ada host untuk cron-nya.
