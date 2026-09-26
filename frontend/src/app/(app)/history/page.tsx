@@ -6,7 +6,6 @@ import Image from "next/image";
 import { Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { BottomNav } from "@/components/ui/BottomNav";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/lib/auth";
 import { deleteLogEntry, getLogs } from "@/lib/api";
@@ -65,7 +64,6 @@ export default function HistoryPage() {
         <Link href="/login">
           <Button>Buat Akun / Masuk</Button>
         </Link>
-        <BottomNav />
       </main>
     );
   }
@@ -73,7 +71,7 @@ export default function HistoryPage() {
   const totalCalories = logs.reduce((sum, log) => sum + (log.nutrition?.calories ?? 0), 0);
 
   return (
-    <main className="flex flex-1 flex-col gap-5 px-5 pb-24 pt-8">
+    <main className="flex flex-1 flex-col gap-5 px-5 pb-24 pt-8 md:px-8 md:pb-12">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Riwayat</h1>
         <p className="mt-1 text-sm text-muted">Total {totalCalories.toFixed(0)} kkal pada tanggal ini.</p>
@@ -138,8 +136,6 @@ export default function HistoryPage() {
           </Card>
         ))}
       </div>
-
-      <BottomNav />
     </main>
   );
 }

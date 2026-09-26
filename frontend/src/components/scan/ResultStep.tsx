@@ -16,7 +16,7 @@ interface ResultStepProps {
 
 export function ResultStep({ previewUrl, scan, nutrition, onConfirm, onCorrect, isSubmitting }: ResultStepProps) {
   return (
-    <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-8">
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-5 pb-10 pt-8">
       <Card className="overflow-hidden p-0">
         <div className="relative aspect-[4/3] w-full">
           <Image src={previewUrl} alt={scan.detected_food_name ?? "Foto makanan"} fill className="object-cover" unoptimized />

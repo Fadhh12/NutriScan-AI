@@ -17,7 +17,7 @@ export function ConfirmedStep({ scan, nutrition, onScanAgain }: ConfirmedStepPro
   const { token } = useAuth();
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-5 px-5 pb-10 pt-8 text-center">
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5 px-5 pb-10 pt-8 text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft text-accent">
         <CheckCircle size={36} weight="fill" />
       </span>
@@ -43,7 +43,7 @@ export function ConfirmedStep({ scan, nutrition, onScanAgain }: ConfirmedStepPro
             </Button>
           </Link>
         )}
-        <Link href="/">
+        <Link href="/app">
           <Button fullWidth variant="secondary">
             Kembali ke Home
           </Button>

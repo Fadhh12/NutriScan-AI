@@ -9,7 +9,7 @@ interface ErrorStepProps {
 
 export function ErrorStep({ message, actionLabel, onAction }: ErrorStepProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-5 pb-10 pt-8 text-center">
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-4 px-5 pb-10 pt-8 text-center">
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-danger-soft text-danger">
         <WarningCircle size={30} weight="fill" />
       </span>

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { BottomNav } from "@/components/ui/BottomNav";
 import { useAuth, clearSession, setSession } from "@/lib/auth";
 import { updateTarget } from "@/lib/api";
 import { presentError } from "@/lib/errorMessages";
@@ -54,13 +53,12 @@ export default function ProfilePage() {
         <Link href="/login">
           <Button>Buat Akun / Masuk</Button>
         </Link>
-        <BottomNav />
       </main>
     );
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8">
+    <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8 md:px-8 md:pb-12">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{user?.name}</h1>
         <p className="mt-1 text-sm text-muted">{user?.email}</p>
@@ -88,8 +86,6 @@ export default function ProfilePage() {
       <Button fullWidth variant="secondary" onClick={handleLogout}>
         Keluar
       </Button>
-
-      <BottomNav />
     </main>
   );
 }

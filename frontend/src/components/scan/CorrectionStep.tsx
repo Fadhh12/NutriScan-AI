@@ -23,7 +23,7 @@ export function CorrectionStep({
   const [manualPortion, setManualPortion] = useState("150");
 
   return (
-    <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-8">
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-5 pb-10 pt-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Pilih yang benar</h1>
         <p className="mt-1 text-sm text-muted">Kami kurang yakin, tolong pilih makanan yang sesuai.</p>

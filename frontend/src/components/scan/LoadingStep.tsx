@@ -7,7 +7,7 @@ interface LoadingStepProps {
 
 export function LoadingStep({ previewUrl }: LoadingStepProps) {
   return (
-    <div className="flex flex-1 flex-col gap-5 px-5 pb-10 pt-8">
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-5 pb-10 pt-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Menganalisis foto...</h1>
         <p className="mt-1 text-sm text-muted">Biasanya butuh beberapa detik.</p>

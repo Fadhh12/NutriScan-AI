@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { BottomNav } from "@/components/ui/BottomNav";
 import { CalorieRing } from "@/components/nutrition/CalorieRing";
 import { CalorieBarChart } from "@/components/nutrition/CalorieBarChart";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -39,13 +38,12 @@ export default function DashboardPage() {
         <Link href="/login">
           <Button>Buat Akun / Masuk</Button>
         </Link>
-        <BottomNav />
       </main>
     );
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8">
+    <main className="flex flex-1 flex-col gap-6 px-5 pb-24 pt-8 md:px-8 md:pb-12">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 text-sm text-muted">Ringkasan kalori 7 hari terakhir.</p>
@@ -72,7 +70,7 @@ export default function DashboardPage() {
       {!isLoading && error && <Card className="p-5 text-sm text-danger">{error}</Card>}
 
       {!isLoading && summary && (
-        <>
+        <div className="grid gap-6 md:grid-cols-2">
           <Card className="p-6">
             <CalorieRing consumed={summary.today.calories} target={summary.target} />
           </Card>
@@ -81,10 +79,8 @@ export default function DashboardPage() {
             <p className="mb-4 text-sm font-medium text-muted">Kalori per Hari</p>
             <CalorieBarChart days={summary.days} target={summary.target} />
           </Card>
-        </>
+        </div>
       )}
-
-      <BottomNav />
     </main>
   );
 }

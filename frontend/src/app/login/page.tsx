@@ -28,7 +28,7 @@ export default function LoginPage() {
       const result =
         mode === "login" ? await login({ email, password }) : await register({ name, email, password });
       setSession(result.token, result.user);
-      router.push("/");
+      router.push("/app");
     } catch (err) {
       setError(presentError(err).message);
     } finally {
@@ -37,7 +37,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col justify-center gap-6 px-5 pb-10 pt-8">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-5 pb-10 pt-8">
       <header className="text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{mode === "login" ? "Masuk" : "Buat Akun"}</h1>
         <p className="mt-1 text-sm text-muted">
@@ -108,7 +108,7 @@ export default function LoginPage() {
         {mode === "login" ? "Belum punya akun? Daftar" : "Sudah punya akun? Masuk"}
       </button>
 
-      <Link href="/" className="text-center text-sm text-muted underline">
+      <Link href="/app" className="text-center text-sm text-muted underline">
         Lanjut sebagai Guest
       </Link>
     </main>
