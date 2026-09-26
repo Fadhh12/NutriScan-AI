@@ -23,6 +23,10 @@ export const env = {
   logMealApiKey: process.env.LOGMEAL_API_KEY ?? "",
   logMealBaseUrl: process.env.LOGMEAL_BASE_URL ?? "https://api.logmeal.com/v2",
 
+  aiInsightProvider: process.env.AI_INSIGHT_PROVIDER ?? "mock",
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+
   maxUploadSizeBytes: Number(process.env.MAX_UPLOAD_SIZE_BYTES ?? 8 * 1024 * 1024),
   minImageDimensionPx: Number(process.env.MIN_IMAGE_DIMENSION_PX ?? 300),
   lowConfidenceThreshold: Number(process.env.LOW_CONFIDENCE_THRESHOLD ?? 0.6),

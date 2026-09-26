@@ -6,3 +6,4 @@ import { asyncHandler } from "../utils/asyncHandler";
 export const dashboardRoutes = Router();
 
 dashboardRoutes.get("/summary", requireAuth, asyncHandler(dashboardController.getSummary));
+dashboardRoutes.get("/insight", requireAuth, asyncHandler(dashboardController.getInsight));

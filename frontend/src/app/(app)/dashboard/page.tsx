@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Sparkle } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CalorieRing } from "@/components/nutrition/CalorieRing";
 import { CalorieBarChart } from "@/components/nutrition/CalorieBarChart";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/lib/auth";
-import { getDashboardSummary } from "@/lib/api";
+import { getDashboardInsight, getDashboardSummary } from "@/lib/api";
 import { presentError } from "@/lib/errorMessages";
 import type { DashboardSummaryResponse } from "@/lib/types";
 
@@ -17,6 +18,8 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [insight, setInsight] = useState<string | null>(null);
+  const [isInsightLoading, setIsInsightLoading] = useState(true);
 
   useEffect(() => {
     if (!ready || !token) return;
@@ -26,6 +29,19 @@ export default function DashboardPage() {
         .then(setSummary)
         .catch((err) => setError(presentError(err).message))
         .finally(() => setIsLoading(false));
+    }
+    load();
+  }, [ready, token]);
+
+  // Separate request, own loading state -- insight generation (Gemini/mock)
+  // shouldn't block the ring + chart from rendering while it's in flight.
+  useEffect(() => {
+    if (!ready || !token) return;
+    function load() {
+      getDashboardInsight(token!)
+        .then((res) => setInsight(res.content))
+        .catch(() => setInsight(null))
+        .finally(() => setIsInsightLoading(false));
     }
     load();
   }, [ready, token]);
@@ -68,6 +84,29 @@ export default function DashboardPage() {
       )}
 
       {!isLoading && error && <Card className="p-5 text-sm text-danger">{error}</Card>}
+
+      {!isLoading && summary && (
+        <Card className="border-accent-soft bg-accent-soft/40 p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+              <Sparkle size={16} weight="fill" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-accent">Insight AI</p>
+              {isInsightLoading ? (
+                <div className="mt-2 space-y-2">
+                  <Skeleton className="h-3.5 w-full" />
+                  <Skeleton className="h-3.5 w-2/3" />
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-foreground">
+                  {insight ?? "Insight belum bisa dimuat, coba lagi nanti."}
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {!isLoading && summary && (
         <div className="grid gap-6 md:grid-cols-2">

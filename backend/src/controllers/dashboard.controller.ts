@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { ok } from "../utils/response";
 import { summarizeRange, type DaySummary } from "../services/log.service";
 import { getUserById } from "../services/auth.service";
+import { getOrCreateInsight } from "../services/aiInsight.service";
 import { nowInWib } from "../utils/localTime";
 
 // Date arithmetic below uses the UTC getters/setters on purpose: nowInWib()
@@ -12,15 +13,15 @@ function toDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Returns a per-day summary for the last 7 days (inclusive of today) vs. the user's target. */
-export async function getSummary(req: Request, res: Response) {
+/** Last 7 days (inclusive of today), zero-filled for days with no logs, plus the user's target. */
+async function getWeekSeries(userId: string): Promise<{ target: number; series: DaySummary[] }> {
   const today = nowInWib();
   const start = new Date(today);
   start.setUTCDate(start.getUTCDate() - 6);
 
   const [user, days] = await Promise.all([
-    getUserById(req.auth!.sub),
-    summarizeRange(req.auth!.sub, toDateOnly(start), toDateOnly(today)),
+    getUserById(userId),
+    summarizeRange(userId, toDateOnly(start), toDateOnly(today)),
   ]);
 
   const byDate = new Map(days.map((d) => [d.date, d]));
@@ -43,12 +44,18 @@ export async function getSummary(req: Request, res: Response) {
     );
   }
 
-  const target = user.daily_calorie_target ?? 2000;
-  const todayEntry = series[series.length - 1];
+  return { target: user.daily_calorie_target ?? 2000, series };
+}
 
-  return ok(res, {
-    target,
-    today: todayEntry,
-    days: series,
-  });
+export async function getSummary(req: Request, res: Response) {
+  const { target, series } = await getWeekSeries(req.auth!.sub);
+  const todayEntry = series[series.length - 1];
+  return ok(res, { target, today: todayEntry, days: series });
+}
+
+/** AI-generated insight from the same 7-day series, cached once per user per day. */
+export async function getInsight(req: Request, res: Response) {
+  const { target, series } = await getWeekSeries(req.auth!.sub);
+  const result = await getOrCreateInsight(req.auth!.sub, { days: series, target });
+  return ok(res, result);
 }

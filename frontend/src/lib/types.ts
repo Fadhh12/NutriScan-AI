@@ -100,3 +100,9 @@ export interface DashboardSummaryResponse {
   today: DaySummary;
   days: DaySummary[];
 }
+
+export interface InsightResponse {
+  content: string;
+  date: string;
+  cached: boolean;
+}

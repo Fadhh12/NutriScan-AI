@@ -96,6 +96,16 @@ async function main() {
   const del = await request(`/logs/${logEntry.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
   assert(del.status === 200, "DELETE /logs/:id -> 200");
 
+  console.log("10. AI insight generates and then caches");
+  const insight1 = await request("/dashboard/insight", { headers: { Authorization: `Bearer ${token}` } });
+  assert(insight1.status === 200 && typeof insight1.body?.data?.content === "string", "GET /dashboard/insight -> 200 + content");
+  assert(insight1.body?.data?.cached === false, "first call generates fresh (cached: false)");
+  const insight2 = await request("/dashboard/insight", { headers: { Authorization: `Bearer ${token}` } });
+  assert(
+    insight2.body?.data?.cached === true && insight2.body?.data?.content === insight1.body?.data?.content,
+    "second call same day returns the cached row unchanged",
+  );
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
 }

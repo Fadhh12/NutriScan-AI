@@ -2,6 +2,7 @@ import type {
   AuthResponse,
   ConfirmScanResponse,
   DashboardSummaryResponse,
+  InsightResponse,
   LogsResponse,
   PublicUser,
   ScanResponse,
@@ -105,6 +106,13 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
     headers: authHeaders(token),
   });
   return parseResponse<DashboardSummaryResponse>(res);
+}
+
+export async function getDashboardInsight(token: string): Promise<InsightResponse> {
+  const res = await fetch(`${API_BASE_URL}/dashboard/insight`, {
+    headers: authHeaders(token),
+  });
+  return parseResponse<InsightResponse>(res);
 }
 
 export async function updateTarget(dailyCalorieTarget: number, token: string): Promise<PublicUser> {

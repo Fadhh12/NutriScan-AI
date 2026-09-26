@@ -58,3 +58,11 @@ export interface JwtPayload {
   sub: string;
   email: string;
 }
+
+export interface AiInsight {
+  id: string;
+  user_id: string;
+  insight_date: string;
+  content: string;
+  created_at: string;
+}

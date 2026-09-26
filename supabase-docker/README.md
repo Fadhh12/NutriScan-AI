@@ -29,6 +29,18 @@ di-grant ke schema `public` di `00-roles.sql` (dibuat sebelum `storage` schema a
 butuh grant tambahan setelah `storage-api` bikin schema-nya sendiri — itu yang dilakukan
 `setup.sh`.
 
+## Menjalankan migration baru
+
+```bash
+cd supabase-docker
+./apply-migration.sh ../backend/supabase/migrations/000X_nama.sql
+```
+
+PostgREST cache schema-nya cuma sekali pas start — tabel/kolom baru gak otomatis
+kelihatan. Tanpa reload, request ke tabel baru bakal error `Could not find the table
+'public.x' in the schema cache` walaupun tabelnya beneran ada. `apply-migration.sh`
+jalanin migration-nya lalu `NOTIFY pgrst, 'reload schema';` sekali jalan.
+
 ## Port
 
 - `55321` — gateway (REST + Storage), ini `SUPABASE_URL`

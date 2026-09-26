@@ -24,6 +24,16 @@ alter default privileges in schema storage grant all on tables to service_role;
 alter default privileges in schema storage grant all on sequences to service_role;
 SQL
 
+# 0001_init.sql is mounted into docker-entrypoint-initdb.d and runs on first
+# boot automatically; every later migration only exists as a file on disk,
+# so a fresh volume needs them applied (and PostgREST's schema cache reloaded).
+for migration in ../backend/supabase/migrations/000[2-9]_*.sql; do
+  [ -e "$migration" ] || continue
+  echo "Applying $migration..."
+  docker exec -i nutriscan-supabase-db-1 psql -U postgres -d postgres < "$migration"
+done
+docker exec -i nutriscan-supabase-db-1 psql -U postgres -d postgres -c "NOTIFY pgrst, 'reload schema';"
+
 SERVICE_KEY=$(grep SERVICE_ROLE_KEY .env | cut -d= -f2)
 curl -s -X POST "http://localhost:55321/storage/v1/bucket" \
   -H "Authorization: Bearer $SERVICE_KEY" \
