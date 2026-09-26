@@ -47,10 +47,10 @@ npm run dev             # http://localhost:3000
 
 Kalau pakai Supabase Cloud:
 
-1. Jalankan migration `backend/supabase/migrations/0001_init.sql` lalu `0002_photo_retention.sql` (urut) di Supabase SQL editor project kamu.
+1. Jalankan migration di `backend/supabase/migrations/` **urut nomor** (`0001`, `0002`, `0003`, dst) di Supabase SQL editor project kamu.
 2. Buat Storage bucket bernama `scan-photos` (public), sesuai `SUPABASE_STORAGE_BUCKET` di `.env`.
 
-Kalau pakai `supabase-docker/setup.sh` (lokal), migration `0001` + langkah bucket sudah otomatis. Migration `0002` perlu dijalankan manual sekali (`docker exec -i <db-container> psql -U postgres -d postgres < backend/supabase/migrations/0002_photo_retention.sql`) kalau volume dibuat sebelum migration ini ada.
+Kalau pakai `supabase-docker/setup.sh` (lokal), migration `0001` + langkah bucket sudah otomatis. Migration setelahnya (`0002`, `0003`, ...) perlu dijalankan manual sekali per migration kalau volume dibuat sebelum migration itu ada: `docker exec -i <db-container> psql -U postgres -d postgres < backend/supabase/migrations/000X_nama.sql`.
 
 ### Retensi Foto (SRS 2.3)
 
