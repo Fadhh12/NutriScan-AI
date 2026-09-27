@@ -62,6 +62,15 @@ export const manualEntrySchema = z.object({
     .optional(),
 });
 
+export const activityTypeSchema = z.enum(["walking", "running", "cycling", "weightlifting", "swimming", "yoga", "other"]);
+export const activityIntensitySchema = z.enum(["low", "medium", "high"]);
+
+export const logActivitySchema = z.object({
+  activityType: activityTypeSchema,
+  intensity: activityIntensitySchema,
+  durationMinutes: z.number().int().min(1, "Duration must be at least 1 minute").max(600, "Duration must be at most 600 minutes"),
+});
+
 export const updateTargetSchema = z.object({
   dailyCalorieTarget: z
     .number()
