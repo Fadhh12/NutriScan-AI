@@ -1,9 +1,12 @@
 import type {
+  Activity,
+  ActivitiesResponse,
   AuthResponse,
   ConfirmScanResponse,
   DashboardSummaryResponse,
   FoodsResponse,
   InsightResponse,
+  LogActivityInput,
   LogsResponse,
   ManualEntryInput,
   ManualEntryResponse,
@@ -134,6 +137,30 @@ export async function getDashboardInsight(token: string): Promise<InsightRespons
     headers: authHeaders(token),
   });
   return parseResponse<InsightResponse>(res);
+}
+
+export async function getActivities(date: string, token: string): Promise<ActivitiesResponse> {
+  const res = await fetch(`${API_BASE_URL}/activities?date=${date}`, {
+    headers: authHeaders(token),
+  });
+  return parseResponse<ActivitiesResponse>(res);
+}
+
+export async function logActivity(input: LogActivityInput, token: string): Promise<{ activity: Activity }> {
+  const res = await fetch(`${API_BASE_URL}/activities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  return parseResponse<{ activity: Activity }>(res);
+}
+
+export async function deleteActivity(id: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/activities/${id}`, {
+    method: "DELETE",
+    headers: authHeaders(token),
+  });
+  await parseResponse<{ deleted: boolean }>(res);
 }
 
 export async function updateTarget(dailyCalorieTarget: number, token: string): Promise<PublicUser> {

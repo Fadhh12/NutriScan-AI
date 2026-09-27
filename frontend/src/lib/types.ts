@@ -142,3 +142,37 @@ export interface InsightResponse {
   date: string;
   cached: boolean;
 }
+
+export type ActivityType = "walking" | "running" | "cycling" | "weightlifting" | "swimming" | "yoga" | "other";
+export type ActivityIntensity = "low" | "medium" | "high";
+
+export interface Activity {
+  id: string;
+  user_id: string;
+  activity_type: ActivityType;
+  intensity: ActivityIntensity;
+  duration_minutes: number;
+  calories_burned: number;
+  log_date: string;
+  logged_at: string;
+  created_at: string;
+}
+
+export interface ActivitySummary {
+  date: string;
+  totalCaloriesBurned: number;
+  totalDurationMinutes: number;
+  byType: Partial<Record<ActivityType, { calories: number; durationMinutes: number; count: number }>>;
+}
+
+export interface ActivitiesResponse {
+  date: string;
+  activities: Activity[];
+  summary: ActivitySummary;
+}
+
+export interface LogActivityInput {
+  activityType: ActivityType;
+  intensity: ActivityIntensity;
+  durationMinutes: number;
+}
