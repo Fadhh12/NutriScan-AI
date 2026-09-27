@@ -25,7 +25,7 @@ export const env = {
 
   aiInsightProvider: process.env.AI_INSIGHT_PROVIDER ?? "mock",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
-  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.8-flash",
 
   maxUploadSizeBytes: Number(process.env.MAX_UPLOAD_SIZE_BYTES ?? 8 * 1024 * 1024),
   minImageDimensionPx: Number(process.env.MIN_IMAGE_DIMENSION_PX ?? 300),

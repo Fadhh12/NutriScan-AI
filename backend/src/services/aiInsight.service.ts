@@ -86,7 +86,10 @@ class GeminiInsightProvider implements AiInsightProvider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 200, temperature: 0.4 },
+        // thinkingBudget: 0 disables extended "thinking" tokens -- without it,
+        // reasoning models like gemini-3.8-flash can spend the whole
+        // maxOutputTokens budget thinking and return a one-word answer.
+        generationConfig: { maxOutputTokens: 300, temperature: 0.4, thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
 
@@ -99,7 +102,12 @@ class GeminiInsightProvider implements AiInsightProvider {
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    // The response can come back as multiple parts -- join all of them,
+    // not just the first, or longer answers get silently truncated.
+    const text = data.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text ?? "")
+      .join("")
+      .trim();
     if (!text) {
       throw new AppError("Gemini returned an empty response", 502, "PROVIDER_ERROR");
     }
@@ -145,7 +153,19 @@ export async function getOrCreateInsight(userId: string, input: InsightInput): P
     return { content: (existing as AiInsight).content, date, cached: true };
   }
 
-  const content = await getProvider().generate(input);
+  let content: string;
+  try {
+    content = await getProvider().generate(input);
+  } catch (err) {
+    // A "nice to have" AI feature failing shouldn't break the whole dashboard.
+    // Free-tier LLM APIs return transient 503s under load; fall back to the
+    // deterministic mock rather than surfacing an error for this call.
+    logger.warn("AI insight provider failed, falling back to mock", {
+      provider: env.aiInsightProvider,
+      err: String(err),
+    });
+    content = await providers.mock.generate(input);
+  }
 
   const { data: saved, error: insertError } = await supabase
     .from("ai_insights")
