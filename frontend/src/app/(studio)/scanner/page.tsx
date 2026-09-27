@@ -8,31 +8,13 @@ import { presentError } from "@/lib/errorMessages";
 import type { FoodDatasetEntry, ScanResponse } from "@/lib/types";
 
 const MODE_TABS = [
-  { key: "scan", icon: "photo_camera", label: "Scan food" },
-  { key: "barcode", icon: "barcode_scanner", label: "Barcode reader" },
-  { key: "table", icon: "table_restaurant", label: "Food table recognition" },
-  { key: "upload", icon: "upload_file", label: "Upload meal photo" },
+  { key: "camera", icon: "photo_camera", label: "Scan kamera" },
+  { key: "upload", icon: "upload_file", label: "Upload foto" },
+  { key: "barcode", icon: "barcode_scanner", label: "Barcode" },
+  { key: "table", icon: "table_restaurant", label: "Cari makanan" },
 ] as const;
 
 type ModeKey = (typeof MODE_TABS)[number]["key"];
-
-const MICRO_CHIPS = [
-  { kcal: 74, name: "Avocado", dot: "bg-emerald-500" },
-  { kcal: 48, name: "Tofu", dot: "bg-blue-500" },
-  { kcal: 36, name: "Carrot", dot: "bg-rose-500" },
-  { kcal: 52, name: "Haricot vert", dot: "bg-teal-500" },
-  { kcal: 22, name: "Radish", dot: "bg-amber-500" },
-  { kcal: 24, name: "Vegetables", dot: "bg-slate-400" },
-];
-
-const INGREDIENTS = [
-  { value: 74, label: "Avocado" },
-  { value: 36, label: "Carrot" },
-  { value: 24, label: "Vegetables" },
-  { value: 22, label: "Radish" },
-  { value: 48, label: "Tofu" },
-  { value: 52, label: "Haricot vert" },
-];
 
 interface DetectedEntry {
   name: string;
@@ -48,20 +30,32 @@ function scale(per100g: number, grams: number) {
   return (per100g * grams) / 100;
 }
 
+const mediaDevicesSupported = () =>
+  typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+
 export default function ScannerPage() {
   const { token } = useAuth();
-  const [mode, setMode] = useState<ModeKey>("scan");
+  const [mode, setMode] = useState<ModeKey>("camera");
 
-  // --- Demo "Scan food" tab (qty multiplier on a fixed demo plate) ---
-  const [qty, setQty] = useState(1);
-  const baseCalories = 256;
-
-  // --- Upload meal photo (real /scan API) ---
+  // --- Shared photo pipeline (camera capture + gallery upload both feed this) ---
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
+  const [qty, setQty] = useState(1);
+
+  // --- Live camera capture ---
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const photoStreamRef = useRef<MediaStream | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const cameraSupported = useSyncExternalStore(
+    () => () => {},
+    () => mediaDevicesSupported(),
+    () => false,
+  );
 
   // --- Barcode reader (real Open Food Facts lookup) ---
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -69,20 +63,9 @@ export default function ScannerPage() {
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
   const [barcodeProduct, setBarcodeProduct] = useState<{ name: string; caloriesPer100g: number; proteinPer100g: number; carbsPer100g: number; fatPer100g: number } | null>(null);
   const [barcodePortion, setBarcodePortion] = useState(100);
-  const [isCameraScanning, setIsCameraScanning] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
-  const cameraSupported = useSyncExternalStore(
-    () => () => {},
-    () => "BarcodeDetector" in window && !!navigator.mediaDevices,
-    () => false,
-  );
-
-  useEffect(() => {
-    return () => {
-      cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
+  const [isBarcodeScanning, setIsBarcodeScanning] = useState(false);
+  const barcodeVideoRef = useRef<HTMLVideoElement>(null);
+  const barcodeStreamRef = useRef<MediaStream | null>(null);
 
   // --- Food table recognition (local dataset search + real log) ---
   const [foodQuery, setFoodQuery] = useState("");
@@ -107,10 +90,30 @@ export default function ScannerPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmedMsg, setConfirmedMsg] = useState<string | null>(null);
 
+  function stopPhotoCamera() {
+    photoStreamRef.current?.getTracks().forEach((t) => t.stop());
+    photoStreamRef.current = null;
+    setIsCameraActive(false);
+  }
+
+  function stopBarcodeCamera() {
+    barcodeStreamRef.current?.getTracks().forEach((t) => t.stop());
+    barcodeStreamRef.current = null;
+    setIsBarcodeScanning(false);
+  }
+
+  useEffect(() => {
+    return () => {
+      stopPhotoCamera();
+      stopBarcodeCamera();
+    };
+  }, []);
+
   function resetAllResults() {
     setPreviewUrl(null);
     setScanResult(null);
     setScanError(null);
+    setQty(1);
     setBarcodeProduct(null);
     setBarcodeError(null);
     setBarcodeInput("");
@@ -119,13 +122,13 @@ export default function ScannerPage() {
   }
 
   function selectMode(next: ModeKey) {
+    if (mode === "camera") stopPhotoCamera();
+    if (mode === "barcode") stopBarcodeCamera();
     setMode(next);
     resetAllResults();
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function processPhoto(file: File) {
     resetAllResults();
     setPreviewUrl(URL.createObjectURL(file));
     setIsScanning(true);
@@ -138,6 +141,44 @@ export default function ScannerPage() {
     } finally {
       setIsScanning(false);
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    void processPhoto(file);
+  }
+
+  async function startPhotoCamera() {
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      photoStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setIsCameraActive(true);
+    } catch {
+      setCameraError("Tidak bisa akses kamera. Cek izin kamera di browser, atau pakai tab Upload Foto.");
+      setIsCameraActive(false);
+    }
+  }
+
+  async function capturePhoto() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    stopPhotoCamera();
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+    if (!blob) return;
+    void processPhoto(new File([blob], "capture.jpg", { type: "image/jpeg" }));
   }
 
   async function lookupBarcode(code: string) {
@@ -167,26 +208,26 @@ export default function ScannerPage() {
     }
   }
 
-  async function startCameraScan() {
+  async function startBarcodeCamera() {
     setBarcodeError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      cameraStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      barcodeStreamRef.current = stream;
+      if (barcodeVideoRef.current) {
+        barcodeVideoRef.current.srcObject = stream;
+        await barcodeVideoRef.current.play();
       }
-      setIsCameraScanning(true);
+      setIsBarcodeScanning(true);
 
       const BarcodeDetectorCtor = (window as unknown as { BarcodeDetector: new (opts: { formats: string[] }) => { detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
       const detector = new BarcodeDetectorCtor({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
 
       const poll = async () => {
-        if (!cameraStreamRef.current || !videoRef.current) return;
+        if (!barcodeStreamRef.current || !barcodeVideoRef.current) return;
         try {
-          const codes = await detector.detect(videoRef.current);
+          const codes = await detector.detect(barcodeVideoRef.current);
           if (codes.length > 0) {
-            stopCameraScan();
+            stopBarcodeCamera();
             setBarcodeInput(codes[0].rawValue);
             void lookupBarcode(codes[0].rawValue);
             return;
@@ -199,21 +240,15 @@ export default function ScannerPage() {
       requestAnimationFrame(poll);
     } catch {
       setBarcodeError("Tidak bisa akses kamera — masukkan barcode manual aja.");
-      setIsCameraScanning(false);
+      setIsBarcodeScanning(false);
     }
-  }
-
-  function stopCameraScan() {
-    cameraStreamRef.current?.getTracks().forEach((t) => t.stop());
-    cameraStreamRef.current = null;
-    setIsCameraScanning(false);
   }
 
   async function handleConfirmLog() {
     setIsConfirming(true);
     setScanError(null);
     try {
-      if (mode === "upload" && scanResult) {
+      if ((mode === "camera" || mode === "upload") && scanResult) {
         await confirmScan(scanResult.scan.id, { confirmed: true }, token);
       } else if (mode === "barcode" && barcodeProduct) {
         await submitManualEntry(
@@ -247,7 +282,7 @@ export default function ScannerPage() {
   }
 
   const detected: DetectedEntry | null =
-    mode === "upload" && scanResult
+    (mode === "camera" || mode === "upload") && scanResult
       ? {
           name: scanResult.scan.detected_food_name ?? "Makanan",
           calories: Math.round(scanResult.nutrition.calories * qty),
@@ -277,20 +312,13 @@ export default function ScannerPage() {
               portion: tablePortion,
               confidence: null,
             }
-          : mode === "scan"
-            ? {
-                name: "Vegetable salad",
-                calories: qty * baseCalories,
-                protein: 53 * qty,
-                carbs: 156 * qty,
-                fat: 64 * qty,
-                portion: null,
-                confidence: null,
-              }
-            : null;
+          : null;
 
   const macroTotal = detected ? detected.protein + detected.carbs + detected.fat || 1 : 1;
-  const canLog = (mode === "upload" && !!scanResult) || (mode === "barcode" && !!barcodeProduct) || (mode === "table" && !!selectedFood);
+  const canLog =
+    ((mode === "camera" || mode === "upload") && !!scanResult) ||
+    (mode === "barcode" && !!barcodeProduct) ||
+    (mode === "table" && !!selectedFood);
 
   return (
     <>
@@ -324,68 +352,144 @@ export default function ScannerPage() {
       <div className="grid grid-cols-1 items-stretch gap-gutter lg:grid-cols-12">
         {/* Left: interactive panel per mode */}
         <div className="group relative flex min-h-[420px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-900 shadow-md sm:min-h-[540px] lg:col-span-7">
-          {mode === "scan" && (
-            <div className="animate-fade-up contents">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                alt="Detected Meal Plate"
-                className="absolute inset-0 h-full w-full select-none object-cover transition-transform duration-700 group-hover:scale-105"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxp_zfUqMJZP95ZFkv0VXPsAqMytGFfK1NW-MXRWrx7w7PCA_eunwJwTIADZWSGglfr3esPMB6wspXBNSF502aRPAtGQA0-q9CaEsJtMWwwBpk_M58ismCYsMb8SKXpdo0634tyriDbWXLoYtw0NTn31RZ8xnVSNdcT5UARIUJgnnPvU4TvTu4hrgntYDg3LkqIsBRm3xxZUTUNhBbOzYZrTdPtJYlLMjEJ5ThITVal_l0y87h1Ys8"
-              />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40" />
-              <div className="relative z-10 flex items-center justify-between p-space-md sm:p-space-lg">
-                <div className="flex items-center gap-space-sm rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
-                  <span className="h-2.5 w-2.5 animate-ping rounded-full bg-rose-600" />
-                  <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">Target Lock: Meal Identified</span>
-                </div>
-                <div className="hidden items-center gap-space-xs sm:flex">
-                  <span className="rounded-lg border border-slate-200/60 bg-white/95 px-space-sm py-space-xs font-label-sm text-xs font-semibold text-slate-700 backdrop-blur-md">FOV 84°</span>
-                  <span className="rounded-lg border border-emerald-200/60 bg-emerald-50/95 px-space-sm py-space-xs font-label-sm text-xs font-bold text-emerald-700 backdrop-blur-md">Conf: 99.4%</span>
-                </div>
-              </div>
-              <div className="relative z-10 flex flex-col justify-center gap-space-lg p-space-md sm:gap-space-xl sm:p-space-lg">
-                <div className="relative ml-2 self-start transition-all hover:scale-105 sm:ml-8 lg:ml-16">
-                  <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
-                    <span className="font-title-md text-title-md text-rose-500">🔥</span>
-                    <div className="flex flex-col">
-                      <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
-                        157 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
-                      </span>
-                      <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">chicken breast</span>
-                    </div>
-                    <span className="ml-space-xs rounded border border-emerald-200/60 bg-emerald-50 px-1.5 py-0.5 font-label-sm text-[10px] font-bold text-emerald-700">98%</span>
+          <canvas ref={canvasRef} className="hidden" />
+
+          {(mode === "camera" || mode === "upload") && (
+            <div className="animate-fade-up flex flex-1 flex-col">
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+              {!previewUrl && mode === "upload" && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-1 flex-col items-center justify-center gap-space-md p-space-xl text-center transition-colors hover:bg-slate-800/60"
+                >
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-600 bg-slate-800">
+                    <Icon name="upload_file" className="text-[32px] text-rose-400" />
+                  </span>
+                  <div>
+                    <p className="font-title-lg text-title-lg font-semibold text-white">Upload foto makanan</p>
+                    <p className="mt-1 font-body-sm text-body-sm text-slate-400">JPG/PNG · dianalisis oleh AI vision asli</p>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-space-xs pt-space-md">
-                  {MICRO_CHIPS.map((chip) => (
-                    <span key={chip.name} className="flex items-center gap-1 rounded-lg border border-slate-200/60 bg-white/95 px-space-sm py-1 font-label-sm text-xs font-medium text-slate-800 shadow-sm backdrop-blur-md">
-                      <span className={`h-2 w-2 rounded-full ${chip.dot}`} /> {chip.kcal} kcal {chip.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="relative z-10 flex items-center justify-between border-t border-slate-200/80 bg-white/95 p-space-md backdrop-blur-md">
-                <div className="flex items-center gap-space-sm">
-                  <Icon name="check_circle" className="text-[22px] text-emerald-600" />
-                  <span className="hidden font-body-md text-body-md font-medium text-slate-800 sm:inline">6 ingredients identified automatically</span>
-                </div>
-                <button className="flex items-center gap-space-xs rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700">
-                  <Icon name="add_a_photo" className="text-[18px]" />
-                  Rescan Plate
                 </button>
-              </div>
+              )}
+
+              {!previewUrl && mode === "camera" && (
+                <div className="flex flex-1 flex-col">
+                  {isCameraActive ? (
+                    <div className="relative flex-1">
+                      <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline />
+                      <div className="pointer-events-none absolute inset-6 rounded-2xl border-2 border-dashed border-white/40" />
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-space-md p-space-lg">
+                        <button
+                          onClick={stopPhotoCamera}
+                          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md"
+                        >
+                          <Icon name="close" className="text-[20px]" />
+                        </button>
+                        <button
+                          onClick={() => void capturePhoto()}
+                          className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-rose-600 text-white shadow-lg transition-transform hover:scale-105"
+                          aria-label="Ambil foto"
+                        >
+                          <Icon name="photo_camera" className="text-[26px]" />
+                        </button>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md"
+                          aria-label="Upload dari galeri"
+                        >
+                          <Icon name="image" className="text-[20px]" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-space-md p-space-xl text-center">
+                      <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-600 bg-slate-800">
+                        <Icon name="photo_camera" className="text-[32px] text-rose-400" />
+                      </span>
+                      <div>
+                        <p className="font-title-lg text-title-lg font-semibold text-white">Scan pakai kamera</p>
+                        <p className="mt-1 max-w-xs font-body-sm text-body-sm text-slate-400">
+                          Arahkan kamera ke makananmu, AI akan deteksi jenis dan estimasi kalorinya otomatis.
+                        </p>
+                      </div>
+                      {cameraSupported ? (
+                        <button
+                          onClick={() => void startPhotoCamera()}
+                          className="flex items-center gap-space-xs rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white transition-all hover:bg-rose-700"
+                        >
+                          <Icon name="videocam" className="text-[18px]" />
+                          Aktifkan kamera
+                        </button>
+                      ) : (
+                        <p className="font-body-sm text-body-sm text-amber-400">Kamera tidak didukung di browser ini.</p>
+                      )}
+                      {cameraError && <p className="max-w-xs font-body-sm text-body-sm text-rose-400">{cameraError}</p>}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="font-label-sm text-xs font-semibold text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+                      >
+                        atau upload dari galeri
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {previewUrl && (
+                <div className="relative flex-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt="Foto makanan" className="absolute inset-0 h-full w-full object-cover" src={previewUrl} />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/30" />
+                  {isScanning && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-md">
+                      <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-rose-400" />
+                      <p className="font-label-sm text-xs font-bold uppercase tracking-widest text-white">Menganalisis foto…</p>
+                    </div>
+                  )}
+                  {!isScanning && scanError && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-md p-space-lg text-center">
+                      <Icon name="error" className="text-[32px] text-rose-400" />
+                      <p className="max-w-xs font-body-sm text-body-sm text-white">{scanError}</p>
+                      <button
+                        onClick={() => (mode === "camera" ? void startPhotoCamera() : fileInputRef.current?.click())}
+                        className="rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white transition-all hover:bg-rose-700"
+                      >
+                        Coba lagi
+                      </button>
+                    </div>
+                  )}
+                  {!isScanning && !scanError && scanResult && (
+                    <div className="animate-fade-up relative z-10 flex h-full flex-col justify-between p-space-lg">
+                      <div className="flex items-center gap-space-sm self-start rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
+                        <Icon name="check_circle" className="text-[18px] text-emerald-600" />
+                        <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">Terdeteksi: {detected?.name}</span>
+                      </div>
+                      <button
+                        onClick={() => (mode === "camera" ? void startPhotoCamera() : fileInputRef.current?.click())}
+                        className="flex items-center gap-space-xs self-end rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700"
+                      >
+                        <Icon name="add_a_photo" className="text-[18px]" />
+                        {mode === "camera" ? "Scan ulang" : "Upload foto lain"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {mode === "barcode" && (
             <div className="animate-fade-up flex flex-1 flex-col gap-space-md p-space-lg">
               <div className="flex flex-1 flex-col items-center justify-center gap-space-md text-center">
-                {isCameraScanning ? (
+                {isBarcodeScanning ? (
                   <div className="relative w-full max-w-sm overflow-hidden rounded-xl border border-slate-700">
-                    <video ref={videoRef} className="aspect-video w-full object-cover" muted playsInline />
+                    <video ref={barcodeVideoRef} className="aspect-video w-full object-cover" muted playsInline />
                     <div className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-rose-500/80" />
                     <button
-                      onClick={stopCameraScan}
+                      onClick={stopBarcodeCamera}
                       className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white"
                     >
                       <Icon name="close" className="text-[18px]" />
@@ -396,7 +500,7 @@ export default function ScannerPage() {
                     <Icon name="barcode_scanner" className="text-[32px] text-rose-400" />
                   </span>
                 )}
-                {!isCameraScanning && (
+                {!isBarcodeScanning && (
                   <div>
                     <p className="font-title-lg text-title-lg font-semibold text-white">Barcode reader</p>
                     <p className="mt-1 max-w-xs font-body-sm text-body-sm text-slate-400">
@@ -404,8 +508,8 @@ export default function ScannerPage() {
                     </p>
                   </div>
                 )}
-                {cameraSupported && !isCameraScanning && (
-                  <button onClick={startCameraScan} className="flex items-center gap-space-xs rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white transition-all hover:bg-rose-700">
+                {cameraSupported && !isBarcodeScanning && (
+                  <button onClick={() => void startBarcodeCamera()} className="flex items-center gap-space-xs rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white transition-all hover:bg-rose-700">
                     <Icon name="videocam" className="text-[18px]" />
                     Scan pakai kamera
                   </button>
@@ -416,7 +520,7 @@ export default function ScannerPage() {
                   e.preventDefault();
                   void lookupBarcode(barcodeInput);
                 }}
-                className="flex items-center gap-2"
+                className="flex flex-col gap-2 sm:flex-row sm:items-center"
               >
                 <input
                   type="text"
@@ -429,7 +533,7 @@ export default function ScannerPage() {
                 <button
                   type="submit"
                   disabled={isLookingUpBarcode || !barcodeInput.trim()}
-                  className="flex items-center gap-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex items-center justify-center gap-1 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isLookingUpBarcode ? (
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -449,7 +553,7 @@ export default function ScannerPage() {
                 <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Cari makanan (mis. Nasi Goreng)…"
+                  placeholder="Cari makanan (mis. Nasi Goreng, Rendang, Alpukat)…"
                   value={foodQuery}
                   onChange={(e) => setFoodQuery(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-800 py-2 pl-10 pr-3 text-sm text-white placeholder:text-slate-500 focus:border-rose-500 focus:outline-none"
@@ -469,70 +573,18 @@ export default function ScannerPage() {
                         setTablePortion(100);
                         setConfirmedMsg(null);
                       }}
-                      className={`flex w-full items-center justify-between border-b border-slate-800 px-space-md py-3 text-left transition-all last:border-b-0 hover:bg-slate-800 ${
+                      className={`flex w-full items-center justify-between gap-space-sm border-b border-slate-800 px-space-md py-3 text-left transition-all last:border-b-0 hover:bg-slate-800 ${
                         selectedFood?.name === food.name ? "bg-slate-800" : ""
                       }`}
                     >
-                      <span className="font-body-md text-body-md font-medium text-white">{food.name}</span>
-                      <span className="font-label-sm text-xs text-slate-400">{food.caloriesPer100g} kcal/100g</span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-body-md text-body-md font-medium text-white">{food.name}</span>
+                        <span className="font-label-sm text-[10px] uppercase tracking-wide text-slate-500">{food.category}</span>
+                      </span>
+                      <span className="shrink-0 font-label-sm text-xs text-slate-400">{food.caloriesPer100g} kcal/100g</span>
                     </button>
                   ))}
               </div>
-            </div>
-          )}
-
-          {mode === "upload" && (
-            <div className="animate-fade-up flex flex-1 flex-col">
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-              {!previewUrl && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex flex-1 flex-col items-center justify-center gap-space-md p-space-xl text-center transition-colors hover:bg-slate-800/60"
-                >
-                  <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-600 bg-slate-800">
-                    <Icon name="upload_file" className="text-[32px] text-rose-400" />
-                  </span>
-                  <div>
-                    <p className="font-title-lg text-title-lg font-semibold text-white">Upload foto makanan</p>
-                    <p className="mt-1 font-body-sm text-body-sm text-slate-400">JPG/PNG · dianalisis oleh model deteksi asli</p>
-                  </div>
-                </button>
-              )}
-              {previewUrl && (
-                <div className="relative flex-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="Foto diupload" className="absolute inset-0 h-full w-full object-cover" src={previewUrl} />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/30" />
-                  {isScanning && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-md">
-                      <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-rose-400" />
-                      <p className="font-label-sm text-xs font-bold uppercase tracking-widest text-white">Menganalisis foto…</p>
-                    </div>
-                  )}
-                  {!isScanning && scanError && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-md p-space-lg text-center">
-                      <Icon name="error" className="text-[32px] text-rose-400" />
-                      <p className="max-w-xs font-body-sm text-body-sm text-white">{scanError}</p>
-                      <button onClick={() => fileInputRef.current?.click()} className="rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white transition-all hover:bg-rose-700">
-                        Coba lagi
-                      </button>
-                    </div>
-                  )}
-                  {!isScanning && !scanError && scanResult && (
-                    <div className="animate-fade-up relative z-10 flex h-full flex-col justify-between p-space-lg">
-                      <div className="flex items-center gap-space-sm self-start rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
-                        <Icon name="check_circle" className="text-[18px] text-emerald-600" />
-                        <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">Terdeteksi: {detected?.name}</span>
-                      </div>
-                      <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-space-xs self-end rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700">
-                        <Icon name="add_a_photo" className="text-[18px]" />
-                        Upload foto lain
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -543,7 +595,10 @@ export default function ScannerPage() {
             <div className="flex flex-1 flex-col items-center justify-center gap-space-sm py-space-xl text-center">
               <Icon name="restaurant" className="text-[32px] text-slate-300" />
               <p className="font-body-sm text-body-sm text-slate-500">
-                {mode === "barcode" ? "Scan atau cari barcode buat lihat hasil di sini." : "Pilih makanan dari tabel buat lihat hasil di sini."}
+                {mode === "camera" && "Scan atau upload foto makanan buat lihat hasil di sini."}
+                {mode === "upload" && "Upload foto makanan buat lihat hasil di sini."}
+                {mode === "barcode" && "Scan atau cari barcode buat lihat hasil di sini."}
+                {mode === "table" && "Pilih makanan dari daftar buat lihat hasil di sini."}
               </p>
             </div>
           ) : (
@@ -553,7 +608,7 @@ export default function ScannerPage() {
                   <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">Detected Item</span>
                   <h3 className="mt-0.5 truncate font-headline-md text-headline-md font-bold tracking-tight text-slate-900">{detected.name}</h3>
                 </div>
-                {mode === "scan" && (
+                {(mode === "camera" || mode === "upload") && scanResult && (
                   <div className="flex shrink-0 items-center rounded-full border border-slate-200/80 bg-slate-100 p-1">
                     <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50">-</button>
                     <span className="px-space-md font-title-md text-title-md font-bold text-slate-900">{qty}</span>
@@ -591,35 +646,19 @@ export default function ScannerPage() {
                 <MacroBar label="Fat" grams={`${detected.fat.toFixed(0)}g`} pct={(detected.fat / macroTotal) * 100} color="bg-blue-500" />
               </div>
 
-              {mode === "scan" && (
-                <div className="flex flex-col gap-space-sm pt-space-xs">
-                  <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">Ingredients (kcal)</span>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {INGREDIENTS.map((ing) => (
-                      <div key={ing.label} className="flex flex-col items-center justify-center rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
-                        <span className="font-headline-sm text-headline-sm font-bold text-slate-900">{ing.value}</span>
-                        <span className="font-label-sm text-[11px] font-medium capitalize text-slate-500">{ing.label}</span>
-                      </div>
-                    ))}
+              <div className="animate-fade-up flex flex-col gap-space-sm pt-space-xs">
+                <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">Detail</span>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
+                    <span className="font-headline-sm text-headline-sm font-bold text-slate-900">{detected.portion ? `${detected.portion.toFixed(0)}g` : "—"}</span>
+                    <p className="font-label-sm text-[11px] font-medium text-slate-500">Estimasi porsi</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
+                    <span className="font-headline-sm text-headline-sm font-bold text-slate-900">{detected.confidence !== null ? `${Math.round(detected.confidence * 100)}%` : "—"}</span>
+                    <p className="font-label-sm text-[11px] font-medium text-slate-500">Keyakinan</p>
                   </div>
                 </div>
-              )}
-
-              {(mode === "upload" || mode === "barcode" || mode === "table") && (
-                <div className="animate-fade-up flex flex-col gap-space-sm pt-space-xs">
-                  <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">Detail</span>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
-                      <span className="font-headline-sm text-headline-sm font-bold text-slate-900">{detected.portion ? `${detected.portion.toFixed(0)}g` : "—"}</span>
-                      <p className="font-label-sm text-[11px] font-medium text-slate-500">Estimasi porsi</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
-                      <span className="font-headline-sm text-headline-sm font-bold text-slate-900">{detected.confidence !== null ? `${Math.round(detected.confidence * 100)}%` : "—"}</span>
-                      <p className="font-label-sm text-[11px] font-medium text-slate-500">Keyakinan</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -628,7 +667,6 @@ export default function ScannerPage() {
               <button
                 onClick={canLog ? handleConfirmLog : undefined}
                 disabled={!canLog || isConfirming || !!confirmedMsg}
-                title={!canLog ? "Data demo — pilih hasil scan/barcode/tabel asli buat log beneran" : undefined}
                 className="flex w-full items-center justify-center gap-space-xs rounded-xl bg-slate-900 px-space-md py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-slate-900"
               >
                 <Icon name={confirmedMsg ? "check_circle" : "check"} className="text-[20px] text-emerald-400" />
