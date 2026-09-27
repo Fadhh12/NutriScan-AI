@@ -156,12 +156,14 @@ class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
 
     const knownNames = foodDataset.slice(0, 60).map((f) => f.name).join(", ");
     const prompt = [
-      "Kamu adalah sistem computer vision untuk aplikasi tracking kalori makanan Indonesia.",
-      "Lihat foto ini dan tentukan apakah ada makanan/minuman di dalamnya.",
-      `Jika ada beberapa jenis makanan berbeda dalam satu foto, urutkan dari yang paling dominan/utama. Kalau nama makanannya mirip salah satu dari daftar referensi ini, pakai persis nama itu (case-sensitive match tidak wajib tapi ejaan harus sama): ${knownNames}, dst. Kalau tidak ada yang cocok, kasih nama makanan yang jelas dan umum (boleh Bahasa Indonesia atau Inggris).`,
+      "Kamu adalah sistem computer vision untuk aplikasi tracking kalori makanan Indonesia, setara ahli gizi yang menganalisis foto piring makanan.",
+      "Lihat foto ini dengan teliti. Piring/nampan sering berisi BEBERAPA komponen makanan berbeda sekaligus (misalnya: nasi + ayam + telur + kentang + sayur di satu piring). Identifikasi SETIAP komponen yang terlihat SECARA TERPISAH, satu per satu — jangan cuma sebutkan satu item yang paling dominan/besar dan mengabaikan sisanya. Contoh: kalau ada nasi, ayam goreng, dan lalapan di piring yang sama, itu HARUS jadi 3 item terpisah di array, bukan 1 item gabungan.",
+      "Untuk tiap komponen, estimasikan porsinya sendiri-sendiri (dalam gram, hanya bagian komponen itu, bukan seluruh piring) dan kandungan gizinya per 100 gram komponen tersebut.",
+      `Kalau nama sebuah komponen mirip salah satu dari daftar referensi ini, pakai persis nama itu (ejaan harus sama): ${knownNames}, dst. Kalau tidak ada yang cocok, kasih nama makanan yang jelas dan spesifik (boleh Bahasa Indonesia atau Inggris), misal "Kentang Panggang" bukan cuma "Kentang".`,
+      "Kalau foto memang cuma berisi satu jenis makanan/minuman (misal segelas jus atau sepotong buah), balas dengan array berisi 1 item saja — jangan mengarang komponen tambahan yang tidak ada di foto.",
       "Balas HANYA dengan JSON valid, tanpa markdown, tanpa teks lain, dengan skema persis:",
-      '{"isFood": boolean, "items": [{"name": string, "confidence": number (0-1), "portionEstimateG": number, "caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number, "fiberPer100g": number, "sugarPer100g": number}]}',
-      "Maksimal 3 item, urutkan dari confidence tertinggi. Kalau foto bukan makanan/minuman sama sekali, balas {\"isFood\": false, \"items\": []}.",
+      '{"isFood": boolean, "items": [{"name": string, "confidence": number (0-1, seberapa yakin identifikasi komponen ini benar), "portionEstimateG": number, "caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number, "fiberPer100g": number, "sugarPer100g": number}]}',
+      "Maksimal 6 komponen berbeda, urutkan dari yang paling besar porsinya. Kalau foto bukan makanan/minuman sama sekali, balas {\"isFood\": false, \"items\": []}.",
     ].join("\n\n");
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel}:generateContent?key=${env.geminiApiKey}`;
@@ -179,7 +181,7 @@ class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
           },
         ],
         generationConfig: {
-          maxOutputTokens: 800,
+          maxOutputTokens: 1400,
           temperature: 0.2,
           responseMimeType: "application/json",
           thinkingConfig: { thinkingBudget: 0 },
@@ -217,7 +219,7 @@ class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
       return { isFood: false, candidates: [] };
     }
 
-    const candidates: FoodCandidate[] = parsed.items.slice(0, 3).map((item) => ({
+    const candidates: FoodCandidate[] = parsed.items.slice(0, 6).map((item) => ({
       name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Makanan tidak dikenal",
       confidence: Math.min(1, Math.max(0, num(item.confidence, 0.5))),
       portionEstimateG: Math.max(1, num(item.portionEstimateG, 150)),

@@ -463,9 +463,11 @@ export default function ScannerPage() {
                   )}
                   {!isScanning && !scanError && scanResult && (
                     <div className="animate-fade-up relative z-10 flex h-full flex-col justify-between p-space-lg">
-                      <div className="flex items-center gap-space-sm self-start rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
-                        <Icon name="check_circle" className="text-[18px] text-emerald-600" />
-                        <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">Terdeteksi: {detected?.name}</span>
+                      <div className="flex max-w-[calc(100%-2rem)] items-center gap-space-sm self-start rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
+                        <Icon name="check_circle" className="shrink-0 text-[18px] text-emerald-600" />
+                        <span className="truncate font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800" title={detected?.name}>
+                          Terdeteksi: {scanResult.items && scanResult.items.length > 1 ? `${scanResult.items.length} komponen` : detected?.name}
+                        </span>
                       </div>
                       <button
                         onClick={() => (mode === "camera" ? void startPhotoCamera() : fileInputRef.current?.click())}
@@ -645,6 +647,29 @@ export default function ScannerPage() {
                 <MacroBar label="Carbs" grams={`${detected.carbs.toFixed(0)}g`} pct={(detected.carbs / macroTotal) * 100} color="bg-emerald-500" />
                 <MacroBar label="Fat" grams={`${detected.fat.toFixed(0)}g`} pct={(detected.fat / macroTotal) * 100} color="bg-blue-500" />
               </div>
+
+              {(mode === "camera" || mode === "upload") && scanResult?.items && scanResult.items.length > 1 && (
+                <div className="animate-fade-up flex flex-col gap-space-sm pt-space-xs">
+                  <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    Komponen terdeteksi ({scanResult.items.length})
+                  </span>
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                    {scanResult.items.map((item, idx) => (
+                      <div key={`${item.name}-${idx}`} className="flex flex-col gap-0.5 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                        <span className="truncate font-label-md text-label-md font-semibold text-slate-800" title={item.name}>
+                          {item.name}
+                        </span>
+                        <span className="font-title-md text-title-md font-bold text-slate-900">
+                          {Math.round(item.nutrition.calories * qty)} <span className="font-body-sm text-body-sm font-normal text-slate-500">kcal</span>
+                        </span>
+                        <span className="font-label-sm text-[10px] text-slate-500">
+                          {item.portionEstimateG.toFixed(0)}g · {Math.round(item.confidence * 100)}% yakin
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="animate-fade-up flex flex-col gap-space-sm pt-space-xs">
                 <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">Detail</span>

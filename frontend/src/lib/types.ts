@@ -36,11 +36,27 @@ export interface ScanCandidate {
   };
 }
 
+export interface ScanItemBreakdown {
+  name: string;
+  confidence: number;
+  portionEstimateG: number;
+  nutrition: {
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+    fiberG: number;
+    sugarG: number;
+  };
+}
+
 export interface ScanResponse {
   scan: Scan;
   nutrition: ScanNutrition;
   lowConfidence: boolean;
   candidates?: ScanCandidate[];
+  /** Set when the vision model detected multiple distinct foods on the plate — one entry per component, already summed into `nutrition` above. */
+  items?: ScanItemBreakdown[];
 }
 
 export interface ConfirmScanResponse {

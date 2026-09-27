@@ -19,6 +19,20 @@ import { inferMealType } from "../utils/localTime";
 import type { MealType } from "../models/types";
 import type { NutritionBreakdown } from "../services/nutrition.service";
 
+function sumNutrition(items: NutritionBreakdown[]): NutritionBreakdown {
+  return items.reduce(
+    (acc, n) => ({
+      calories: acc.calories + n.calories,
+      proteinG: acc.proteinG + n.proteinG,
+      carbsG: acc.carbsG + n.carbsG,
+      fatG: acc.fatG + n.fatG,
+      fiberG: acc.fiberG + n.fiberG,
+      sugarG: acc.sugarG + n.sugarG,
+    }),
+    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0 },
+  );
+}
+
 async function assertValidImageDimensions(buffer: Buffer) {
   const metadata = await sharp(buffer).metadata();
   const { width, height } = metadata;
@@ -46,37 +60,64 @@ export async function scanPhoto(req: Request, res: Response) {
     throw new AppError("Tidak terdeteksi makanan, coba foto ulang", 422, "NOT_FOOD");
   }
 
-  const [primary, ...alternatives] = recognition.candidates;
-  const nutrition = primary.nutrition100g
-    ? scaleNutritionPer100g(primary.nutrition100g, primary.portionEstimateG)
-    : await getNutritionForFood(primary.name, primary.portionEstimateG);
+  // Gemini estimates composition for every distinct component it sees on the
+  // plate (nutrition100g set on all of them) — sum them into one meal total
+  // instead of only keeping the single most dominant item. Providers that
+  // only guess a name (mock/logmeal) keep the old single-item + "did you
+  // mean" alternatives flow, since their candidates are ranked guesses for
+  // ONE food, not simultaneous separate foods.
+  const isMultiItemPlate = recognition.candidates.every((c) => c.nutrition100g);
+
+  let detectedFoodName: string;
+  let confidenceScore: number;
+  let portionEstimateG: number;
+  let nutrition: NutritionBreakdown;
+  let isLowConfidence: boolean;
+  let items: Array<{ name: string; confidence: number; portionEstimateG: number; nutrition: NutritionBreakdown }> | undefined;
+  let candidates:
+    | Array<{ name: string; confidence: number; portionEstimateG: number; nutrition: NutritionBreakdown }>
+    | undefined;
+
+  if (isMultiItemPlate) {
+    items = recognition.candidates.map((c) => ({
+      name: c.name,
+      confidence: c.confidence,
+      portionEstimateG: c.portionEstimateG,
+      nutrition: scaleNutritionPer100g(c.nutrition100g!, c.portionEstimateG),
+    }));
+    detectedFoodName = items.map((i) => i.name).join(", ");
+    portionEstimateG = items.reduce((sum, i) => sum + i.portionEstimateG, 0);
+    confidenceScore = Number((items.reduce((sum, i) => sum + i.confidence, 0) / items.length).toFixed(2));
+    nutrition = sumNutrition(items.map((i) => i.nutrition));
+    isLowConfidence = confidenceScore < env.lowConfidenceThreshold;
+  } else {
+    const [primary, ...alternatives] = recognition.candidates;
+    detectedFoodName = primary.name;
+    confidenceScore = primary.confidence;
+    portionEstimateG = primary.portionEstimateG;
+    nutrition = await getNutritionForFood(primary.name, primary.portionEstimateG);
+    isLowConfidence = primary.confidence < env.lowConfidenceThreshold;
+
+    if (isLowConfidence) {
+      candidates = await Promise.all(
+        [primary, ...alternatives].map(async (c: FoodCandidate) => ({
+          name: c.name,
+          confidence: c.confidence,
+          portionEstimateG: c.portionEstimateG,
+          nutrition: await getNutritionForFood(c.name, c.portionEstimateG),
+        })),
+      );
+    }
+  }
 
   const scan = await createScan({
     userId,
     imageUrl,
-    detectedFoodName: primary.name,
-    confidenceScore: primary.confidence,
-    portionEstimateG: primary.portionEstimateG,
+    detectedFoodName,
+    confidenceScore,
+    portionEstimateG,
   });
   const savedNutrition = await createScanNutrition(scan.id, nutrition);
-
-  const isLowConfidence = primary.confidence < env.lowConfidenceThreshold;
-  let candidates:
-    | Array<{ name: string; confidence: number; portionEstimateG: number; nutrition: Awaited<ReturnType<typeof getNutritionForFood>> }>
-    | undefined;
-
-  if (isLowConfidence) {
-    candidates = await Promise.all(
-      [{ ...primary }, ...alternatives].map(async (c: FoodCandidate) => ({
-        name: c.name,
-        confidence: c.confidence,
-        portionEstimateG: c.portionEstimateG,
-        nutrition: c.nutrition100g
-          ? scaleNutritionPer100g(c.nutrition100g, c.portionEstimateG)
-          : await getNutritionForFood(c.name, c.portionEstimateG),
-      })),
-    );
-  }
 
   return ok(
     res,
@@ -85,6 +126,7 @@ export async function scanPhoto(req: Request, res: Response) {
       nutrition: savedNutrition,
       lowConfidence: isLowConfidence,
       candidates,
+      items,
     },
     201,
   );
