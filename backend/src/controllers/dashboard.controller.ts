@@ -3,6 +3,7 @@ import { ok } from "../utils/response";
 import { summarizeRange, type DaySummary } from "../services/log.service";
 import { getUserById } from "../services/auth.service";
 import { getOrCreateInsight } from "../services/aiInsight.service";
+import { getPlanRecommendation } from "../services/aiPlan.service";
 import { nowInWib } from "../utils/localTime";
 
 // Date arithmetic below uses the UTC getters/setters on purpose: nowInWib()
@@ -57,5 +58,12 @@ export async function getSummary(req: Request, res: Response) {
 export async function getInsight(req: Request, res: Response) {
   const { target, series } = await getWeekSeries(req.auth!.sub);
   const result = await getOrCreateInsight(req.auth!.sub, { days: series, target });
+  return ok(res, result);
+}
+
+/** AI-generated calorie/macro target recommendation from the same 7-day series. Not cached — recomputed on demand so the plan page can regenerate it. */
+export async function getPlan(req: Request, res: Response) {
+  const { target, series } = await getWeekSeries(req.auth!.sub);
+  const result = await getPlanRecommendation({ days: series, currentTarget: target });
   return ok(res, result);
 }
