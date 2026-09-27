@@ -6,6 +6,7 @@ import {
   Sparkle,
   ArrowRight,
   ForkKnife,
+  CheckCircle,
 } from "@phosphor-icons/react/dist/ssr";
 
 const STEPS = [
@@ -18,11 +19,25 @@ const STEPS = [
 export default function LandingPage() {
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-border">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 md:px-8">
+      <header className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4 md:px-8">
           <span className="text-sm font-semibold tracking-tight text-foreground">
             NutriScan <span className="text-accent">AI</span>
           </span>
+          <div className="hidden items-center gap-1 md:flex">
+            <a
+              href="#fitur"
+              className="rounded-full px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+            >
+              Fitur
+            </a>
+            <a
+              href="#cara-kerja"
+              className="rounded-full px-4 py-2 text-sm font-medium text-muted transition hover:bg-surface-elevated hover:text-foreground"
+            >
+              Cara kerja
+            </a>
+          </div>
           <nav className="flex items-center gap-2">
             <Link
               href="/login"
@@ -47,9 +62,21 @@ export default function LandingPage() {
             className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-accent-soft opacity-60 blur-3xl"
             aria-hidden="true"
           />
+          <div
+            className="pointer-events-none absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-accent-soft opacity-40 blur-3xl"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.4] [background-image:radial-gradient(var(--border)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:linear-gradient(to_bottom,black,transparent)]"
+            aria-hidden="true"
+          />
           <div className="relative mx-auto grid w-full max-w-6xl gap-10 px-5 py-16 md:grid-cols-2 md:items-center md:gap-16 md:px-8 md:py-24">
             <div>
-              <h1 className="animate-fade-up text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+              <span className="animate-fade-up inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-xs font-medium text-accent">
+                <Sparkle size={12} weight="fill" />
+                Kalori & gizi, dibaca dari foto
+              </span>
+              <h1 className="mt-4 animate-fade-up text-4xl font-semibold tracking-tight text-foreground [animation-delay:40ms] md:text-5xl">
                 Foto makananmu. Kalorinya kelihatan sendiri.
               </h1>
               <p className="mt-5 max-w-md animate-fade-up text-base text-muted [animation-delay:100ms] md:text-lg">
@@ -72,9 +99,19 @@ export default function LandingPage() {
                   Buat akun
                 </Link>
               </div>
-              <p className="mt-4 text-xs text-muted">
-                Coba tanpa akun dulu — riwayat & dashboard baru tersimpan setelah kamu daftar.
-              </p>
+              <div className="mt-6 flex animate-fade-up flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted [animation-delay:260ms]">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-accent" />
+                  Gratis dicoba
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-accent" />
+                  Gak perlu akun buat mulai
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle size={14} className="text-accent" />4 langkah ke hasil
+                </span>
+              </div>
             </div>
 
             {/* Decorative product preview — mirrors the real ResultStep card */}
@@ -101,14 +138,16 @@ export default function LandingPage() {
         </section>
 
         {/* Features — asymmetric, not equal 3-column */}
-        <section className="mx-auto w-full max-w-6xl px-5 py-16 md:px-8 md:py-24">
+        <section id="fitur" className="mx-auto w-full max-w-6xl scroll-mt-20 px-5 py-16 md:px-8 md:py-24">
           <h2 className="max-w-md text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             Semua yang perlu dilihat sebelum makan berikutnya.
           </h2>
 
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             <div className="rounded-card bg-accent-soft p-8 md:col-span-2 md:row-span-2">
-              <Camera size={28} className="text-accent" />
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                <Camera size={22} weight="bold" />
+              </span>
               <h3 className="mt-4 text-xl font-semibold text-foreground">Scan, bukan tebak-tebakan</h3>
               <p className="mt-2 max-w-md text-sm text-muted">
                 Ambil foto lewat kamera atau upload dari galeri. Kalau sistem kurang yakin,
@@ -117,16 +156,20 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="rounded-card border border-border p-6">
-              <ClockCounterClockwise size={24} className="text-accent" />
+            <div className="rounded-card border border-border p-6 transition hover:border-accent/40 hover:shadow-md">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent">
+                <ClockCounterClockwise size={20} weight="bold" />
+              </span>
               <h3 className="mt-3 font-semibold text-foreground">Riwayat harian</h3>
               <p className="mt-1 text-sm text-muted">
                 Semua yang kamu makan tercatat otomatis, bisa difilter per tanggal.
               </p>
             </div>
 
-            <div className="rounded-card border border-border p-6">
-              <ChartBar size={24} className="text-accent" />
+            <div className="rounded-card border border-border p-6 transition hover:border-accent/40 hover:shadow-md">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-accent">
+                <ChartBar size={20} weight="bold" />
+              </span>
               <h3 className="mt-3 font-semibold text-foreground">Dashboard mingguan</h3>
               <p className="mt-1 text-sm text-muted">
                 Grafik kalori 7 hari vs target, jadi keliatan tren-nya, bukan cuma angka
@@ -138,31 +181,51 @@ export default function LandingPage() {
 
         {/* AI insight callout */}
         <section className="mx-auto w-full max-w-6xl px-5 py-4 md:px-8">
-          <div className="flex flex-col items-start gap-6 rounded-card border border-accent-soft bg-accent-soft/40 p-8 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-start gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                <Sparkle size={20} weight="fill" />
-              </span>
-              <div>
-                <h3 className="font-semibold text-foreground">Insight harian dari AI, bukan cuma grafik</h3>
-                <p className="mt-1 max-w-lg text-sm text-muted">
-                  Dashboard-mu dibaca ulang tiap hari — kalau protein kurang tiga hari
-                  berturut-turut atau kalori kamu sering lewat target sore hari, kamu dikasih
-                  tahu, bukan cuma dikasih angka.
-                </p>
+          <div className="grid gap-8 rounded-card border border-accent-soft bg-accent-soft/40 p-8 shadow-sm md:grid-cols-[1.2fr_1fr] md:items-center">
+            <div>
+              <div className="flex items-start gap-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                  <Sparkle size={20} weight="fill" />
+                </span>
+                <div>
+                  <h3 className="font-semibold text-foreground">Insight harian dari AI, bukan cuma grafik</h3>
+                  <p className="mt-1 max-w-lg text-sm text-muted">
+                    Dashboard-mu dibaca ulang tiap hari — kalau protein kurang tiga hari
+                    berturut-turut atau kalori kamu sering lewat target sore hari, kamu
+                    dikasih tahu, bukan cuma dikasih angka.
+                  </p>
+                </div>
               </div>
+              <Link
+                href="/login"
+                className="mt-5 inline-flex rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition hover:brightness-110 active:scale-[0.98]"
+              >
+                Coba Dashboard
+              </Link>
             </div>
-            <Link
-              href="/login"
-              className="shrink-0 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition hover:brightness-110 active:scale-[0.98]"
-            >
-              Coba Dashboard
-            </Link>
+
+            {/* Mini chart mockup mirrors the real CalorieBarChart */}
+            <div className="rounded-card border border-border bg-surface p-5 shadow-sm">
+              <p className="text-xs font-medium text-muted">Kalori per Hari</p>
+              <div className="mt-4 flex h-20 items-end justify-between gap-2">
+                {[45, 65, 40, 80, 55, 70, 90].map((h, i) => (
+                  <div
+                    key={i}
+                    className={`w-full rounded-t ${i === 6 ? "bg-warning" : "bg-accent"}`}
+                    style={{ height: `${h}%` }}
+                  />
+                ))}
+              </div>
+              <p className="mt-3 flex items-center gap-1.5 text-xs text-accent">
+                <Sparkle size={12} weight="fill" />
+                &quot;Protein rata-rata cuma 38g/hari — coba tambah telur atau tahu.&quot;
+              </p>
+            </div>
           </div>
         </section>
 
         {/* How it works */}
-        <section className="mx-auto w-full max-w-6xl px-5 py-16 md:px-8 md:py-24">
+        <section id="cara-kerja" className="mx-auto w-full max-w-6xl scroll-mt-20 px-5 py-16 md:px-8 md:py-24">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
             Dari foto sampai ke log, empat langkah.
           </h2>
@@ -191,8 +254,12 @@ export default function LandingPage() {
         </section>
 
         {/* CTA band */}
-        <section className="border-t border-border bg-surface-elevated">
-          <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-5 py-16 md:flex-row md:items-center md:justify-between md:px-8">
+        <section className="relative overflow-hidden border-t border-border bg-surface-elevated">
+          <div
+            className="pointer-events-none absolute -right-16 top-1/2 h-64 w-64 -translate-y-1/2 rounded-full bg-accent-soft opacity-50 blur-3xl"
+            aria-hidden="true"
+          />
+          <div className="relative mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-5 py-16 md:flex-row md:items-center md:justify-between md:px-8">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                 Makan siang berikutnya, foto dulu sebelum sendok pertama.
