@@ -1,18 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth";
+import { confirmScan, submitScan } from "@/lib/api";
+import { presentError } from "@/lib/errorMessages";
+import type { ScanResponse } from "@/lib/types";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
 
+const SECTION_IDS = ["scanner-suite", "calorie-analytics", "custom-planner", "dashboard-analytics", "activity-burn"];
+
 const NAV_LINKS = [
-  { label: "AI Scanner", active: true },
-  { label: "Nutrition Intake" },
-  { label: "Calorie Tracker" },
-  { label: "Custom Plan" },
-  { label: "Dashboard & Analytics" },
-  { label: "Activity Tracker" },
+  { label: "AI Scanner", href: "#scanner-suite" },
+  { label: "Nutrition Intake", href: "#scanner-suite" },
+  { label: "Calorie Tracker", href: "#calorie-analytics" },
+  { label: "Custom Plan", href: "#custom-planner" },
+  { label: "Dashboard & Analytics", href: "#dashboard-analytics" },
+  { label: "Activity Tracker", href: "#activity-burn" },
 ];
 
 const ANCHOR_TABS = [
@@ -22,6 +29,15 @@ const ANCHOR_TABS = [
   { href: "#dashboard-analytics", icon: "bar_chart", iconColor: "text-rose-500", label: "Weekly Metrics" },
   { href: "#activity-burn", icon: "fitness_center", iconColor: "text-emerald-600", label: "Energy Burn" },
 ];
+
+const MODE_TABS = [
+  { key: "scan", icon: "photo_camera", label: "Scan food" },
+  { key: "barcode", icon: "barcode_scanner", label: "Barcode reader" },
+  { key: "table", icon: "table_restaurant", label: "Food table recognition" },
+  { key: "upload", icon: "upload_file", label: "Upload meal photo" },
+] as const;
+
+type ModeKey = (typeof MODE_TABS)[number]["key"];
 
 const MICRO_CHIPS = [
   { kcal: 74, name: "Avocado", dot: "bg-emerald-500" },
@@ -62,6 +78,7 @@ const STEPS_WEEK = [
 ];
 
 export function StudioDashboard() {
+  const { token } = useAuth();
   const [qty, setQty] = useState(1);
   const baseCalories = 256;
 
@@ -69,6 +86,94 @@ export function StudioDashboard() {
   const [sliderProtein, setSliderProtein] = useState(120);
   const [sliderCarbs, setSliderCarbs] = useState(380);
   const [sliderFat, setSliderFat] = useState(85);
+
+  const [activeSection, setActiveSection] = useState(SECTION_IDS[0]);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]) setActiveSection(visible[0].target.id);
+      },
+      { rootMargin: "-30% 0px -60% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] },
+    );
+    SECTION_IDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const [mode, setMode] = useState<ModeKey>("scan");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResponse | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmedMsg, setConfirmedMsg] = useState<string | null>(null);
+
+  function resetUpload() {
+    setPreviewUrl(null);
+    setScanResult(null);
+    setScanError(null);
+    setConfirmedMsg(null);
+  }
+
+  function selectMode(next: ModeKey) {
+    setMode(next);
+    if (next !== "upload") resetUpload();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    resetUpload();
+    setPreviewUrl(URL.createObjectURL(file));
+    setIsScanning(true);
+    try {
+      const res = await submitScan(file, token);
+      setScanResult(res);
+      setQty(1);
+    } catch (err) {
+      setScanError(presentError(err).message);
+    } finally {
+      setIsScanning(false);
+    }
+  }
+
+  async function handleConfirmLog() {
+    if (!scanResult) return;
+    setIsConfirming(true);
+    try {
+      await confirmScan(scanResult.scan.id, { confirmed: true }, token);
+      setConfirmedMsg("Tersimpan ke log hari ini.");
+    } catch (err) {
+      setScanError(presentError(err).message);
+    } finally {
+      setIsConfirming(false);
+    }
+  }
+
+  const detected = scanResult
+    ? {
+        name: scanResult.scan.detected_food_name ?? "Makanan",
+        calories: Math.round(scanResult.nutrition.calories * qty),
+        protein: scanResult.nutrition.protein_g * qty,
+        carbs: scanResult.nutrition.carbs_g * qty,
+        fat: scanResult.nutrition.fat_g * qty,
+        portion: scanResult.scan.portion_estimate_g,
+        confidence: scanResult.scan.confidence_score,
+      }
+    : {
+        name: "Vegetable salad",
+        calories: qty * baseCalories,
+        protein: 53 * qty,
+        carbs: 156 * qty,
+        fat: 64 * qty,
+        portion: null as number | null,
+        confidence: null as number | null,
+      };
+  const macroTotal = detected.protein + detected.carbs + detected.fat || 1;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-body-md text-[#0F172A] antialiased selection:bg-rose-100 selection:text-rose-900">
@@ -90,20 +195,23 @@ export function StudioDashboard() {
               </div>
             </a>
             <nav className="hidden items-center gap-space-xs rounded-xl border border-slate-200/60 bg-slate-100/80 p-1 xl:flex">
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.label}
-                  aria-current={link.active ? "page" : undefined}
-                  href="#"
-                  className={
-                    link.active
-                      ? "rounded-lg bg-white px-space-md py-space-sm text-sm font-semibold text-slate-900 shadow-sm transition-all"
-                      : "rounded-lg px-space-md py-space-sm text-sm font-medium text-slate-600 transition-all hover:bg-white/60 hover:text-slate-900"
-                  }
-                >
-                  {link.label}
-                </a>
-              ))}
+              {NAV_LINKS.map((link) => {
+                const isActive = link.href === `#${activeSection}`;
+                return (
+                  <a
+                    key={link.label}
+                    aria-current={isActive ? "page" : undefined}
+                    href={link.href}
+                    className={
+                      isActive
+                        ? "rounded-lg bg-white px-space-md py-space-sm text-sm font-semibold text-slate-900 shadow-sm transition-all duration-300"
+                        : "rounded-lg px-space-md py-space-sm text-sm font-medium text-slate-600 transition-all duration-300 hover:bg-white/60 hover:text-slate-900"
+                    }
+                  >
+                    {link.label}
+                  </a>
+                );
+              })}
             </nav>
           </div>
           <div className="flex items-center gap-space-md">
@@ -122,15 +230,18 @@ export function StudioDashboard() {
                 <span className="text-sm font-bold text-rose-600">-560 kcal</span>
               </div>
             </div>
-            <a
-              href="#"
+            <Link
+              href={token ? "/dashboard" : "/login"}
               className="hidden items-center justify-center rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-rose-700 hover:shadow-md sm:inline-flex"
             >
-              Get Started Free
-            </a>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm">
+              {token ? "Buka Dashboard" : "Get Started Free"}
+            </Link>
+            <Link
+              href={token ? "/profile" : "/login"}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition-transform hover:scale-105"
+            >
               <Icon name="person" className="text-[18px]" />
-            </div>
+            </Link>
           </div>
         </div>
       </header>
@@ -149,16 +260,23 @@ export function StudioDashboard() {
               </span>
             </div>
             <div className="scrollbar-none flex items-center gap-space-xs overflow-x-auto py-0.5">
-              {ANCHOR_TABS.map((tab) => (
-                <a
-                  key={tab.label}
-                  href={tab.href}
-                  className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200/60 bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-all hover:bg-slate-200/80"
-                >
-                  <Icon name={tab.icon} className={`text-[16px] ${tab.iconColor}`} />
-                  {tab.label}
-                </a>
-              ))}
+              {ANCHOR_TABS.map((tab) => {
+                const isActive = tab.href === `#${activeSection}`;
+                return (
+                  <a
+                    key={tab.label}
+                    href={tab.href}
+                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all duration-300 ${
+                      isActive
+                        ? "border-slate-900/10 bg-slate-900 text-white shadow-sm"
+                        : "border-slate-200/60 bg-slate-100 text-slate-700 hover:bg-slate-200/80"
+                    }`}
+                  >
+                    <Icon name={tab.icon} className={`text-[16px] ${isActive ? "text-white" : tab.iconColor}`} />
+                    {tab.label}
+                  </a>
+                );
+              })}
             </div>
           </div>
 
@@ -180,127 +298,225 @@ export function StudioDashboard() {
                   </h2>
                 </div>
                 <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                  <button className="flex items-center gap-space-xs rounded-lg bg-slate-900 px-space-md py-space-sm text-sm font-semibold text-white shadow-sm transition-all">
-                    <Icon name="photo_camera" className="text-[18px] text-rose-400" />
-                    Scan food
-                  </button>
-                  <button className="flex items-center gap-space-xs rounded-lg px-space-md py-space-sm text-sm font-medium text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900">
-                    <Icon name="barcode_scanner" className="text-[18px]" />
-                    Barcode reader
-                  </button>
-                  <button className="flex items-center gap-space-xs rounded-lg px-space-md py-space-sm text-sm font-medium text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900">
-                    <Icon name="table_restaurant" className="text-[18px]" />
-                    Food table recognition
-                  </button>
-                  <button className="flex items-center gap-space-xs rounded-lg px-space-md py-space-sm text-sm font-medium text-slate-600 transition-all hover:bg-slate-100 hover:text-slate-900">
-                    <Icon name="upload_file" className="text-[18px]" />
-                    Upload meal photo
-                  </button>
+                  {MODE_TABS.map((tab) => {
+                    const isActive = mode === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => selectMode(tab.key)}
+                        className={`flex items-center gap-space-xs rounded-lg px-space-md py-space-sm text-sm transition-all duration-300 ${
+                          isActive
+                            ? "bg-slate-900 font-semibold text-white shadow-sm"
+                            : "font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        }`}
+                      >
+                        <Icon name={tab.icon} className={`text-[18px] ${isActive ? "text-rose-400" : ""}`} />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 items-stretch gap-gutter lg:grid-cols-12">
                 {/* Left: viewfinder */}
                 <div className="group relative flex min-h-[540px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-900 shadow-md lg:col-span-7">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    alt="Detected Meal Plate"
-                    className="absolute inset-0 h-full w-full select-none object-cover transition-transform duration-700 group-hover:scale-105"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxp_zfUqMJZP95ZFkv0VXPsAqMytGFfK1NW-MXRWrx7w7PCA_eunwJwTIADZWSGglfr3esPMB6wspXBNSF502aRPAtGQA0-q9CaEsJtMWwwBpk_M58ismCYsMb8SKXpdo0634tyriDbWXLoYtw0NTn31RZ8xnVSNdcT5UARIUJgnnPvU4TvTu4hrgntYDg3LkqIsBRm3xxZUTUNhBbOzYZrTdPtJYlLMjEJ5ThITVal_l0y87h1Ys8"
-                  />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40" />
+                  {mode === "scan" && (
+                    <div key="scan" className="animate-fade-up contents">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        alt="Detected Meal Plate"
+                        className="absolute inset-0 h-full w-full select-none object-cover transition-transform duration-700 group-hover:scale-105"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxp_zfUqMJZP95ZFkv0VXPsAqMytGFfK1NW-MXRWrx7w7PCA_eunwJwTIADZWSGglfr3esPMB6wspXBNSF502aRPAtGQA0-q9CaEsJtMWwwBpk_M58ismCYsMb8SKXpdo0634tyriDbWXLoYtw0NTn31RZ8xnVSNdcT5UARIUJgnnPvU4TvTu4hrgntYDg3LkqIsBRm3xxZUTUNhBbOzYZrTdPtJYlLMjEJ5ThITVal_l0y87h1Ys8"
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40" />
 
-                  <div className="relative z-10 flex items-center justify-between p-space-lg">
-                    <div className="flex items-center gap-space-sm rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
-                      <span className="h-2.5 w-2.5 animate-ping rounded-full bg-rose-600" />
-                      <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">
-                        Target Lock: Meal Identified
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-space-xs">
-                      <span className="rounded-lg border border-slate-200/60 bg-white/95 px-space-sm py-space-xs font-label-sm text-xs font-semibold text-slate-700 backdrop-blur-md">
-                        FOV 84°
-                      </span>
-                      <span className="rounded-lg border border-emerald-200/60 bg-emerald-50/95 px-space-sm py-space-xs font-label-sm text-xs font-bold text-emerald-700 backdrop-blur-md">
-                        Conf: 99.4%
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 flex flex-col justify-center gap-space-xl p-space-lg">
-                    <div className="relative ml-8 self-start transition-all hover:scale-105 sm:ml-16">
-                      <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
-                        <span className="font-title-md text-title-md text-rose-500">🔥</span>
-                        <div className="flex flex-col">
-                          <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
-                            157 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
-                          </span>
-                          <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            chicken breast
+                      <div className="relative z-10 flex items-center justify-between p-space-lg">
+                        <div className="flex items-center gap-space-sm rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
+                          <span className="h-2.5 w-2.5 animate-ping rounded-full bg-rose-600" />
+                          <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">
+                            Target Lock: Meal Identified
                           </span>
                         </div>
-                        <span className="ml-space-xs rounded bg-emerald-50 px-1.5 py-0.5 font-label-sm text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
-                          98%
-                        </span>
+                        <div className="flex items-center gap-space-xs">
+                          <span className="rounded-lg border border-slate-200/60 bg-white/95 px-space-sm py-space-xs font-label-sm text-xs font-semibold text-slate-700 backdrop-blur-md">
+                            FOV 84°
+                          </span>
+                          <span className="rounded-lg border border-emerald-200/60 bg-emerald-50/95 px-space-sm py-space-xs font-label-sm text-xs font-bold text-emerald-700 backdrop-blur-md">
+                            Conf: 99.4%
+                          </span>
+                        </div>
                       </div>
-                      <div className="absolute -bottom-3 left-6 h-2.5 w-2.5 rounded-full bg-rose-600 shadow-[0_0_12px_rgba(225,29,72,0.8)]" />
-                    </div>
 
-                    <div className="flex flex-wrap items-center justify-end gap-space-lg pr-4 sm:pr-12">
-                      <div className="relative transition-all hover:scale-105">
-                        <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
-                          <span className="font-title-md text-title-md text-rose-500">🔥</span>
-                          <div className="flex flex-col">
-                            <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
-                              86 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
-                            </span>
-                            <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                              tomato
+                      <div className="relative z-10 flex flex-col justify-center gap-space-xl p-space-lg">
+                        <div className="relative ml-8 self-start transition-all hover:scale-105 sm:ml-16">
+                          <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
+                            <span className="font-title-md text-title-md text-rose-500">🔥</span>
+                            <div className="flex flex-col">
+                              <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
+                                157 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
+                              </span>
+                              <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                chicken breast
+                              </span>
+                            </div>
+                            <span className="ml-space-xs rounded bg-emerald-50 px-1.5 py-0.5 font-label-sm text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
+                              98%
                             </span>
                           </div>
+                          <div className="absolute -bottom-3 left-6 h-2.5 w-2.5 rounded-full bg-rose-600 shadow-[0_0_12px_rgba(225,29,72,0.8)]" />
                         </div>
-                        <div className="absolute -top-3 right-6 h-2.5 w-2.5 rounded-full bg-rose-600 shadow-[0_0_12px_rgba(225,29,72,0.8)]" />
-                      </div>
-                      <div className="relative transition-all hover:scale-105">
-                        <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
-                          <span className="font-title-md text-title-md text-rose-500">🔥</span>
-                          <div className="flex flex-col">
-                            <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
-                              34 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
-                            </span>
-                            <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                              lettuce
-                            </span>
+
+                        <div className="flex flex-wrap items-center justify-end gap-space-lg pr-4 sm:pr-12">
+                          <div className="relative transition-all hover:scale-105">
+                            <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
+                              <span className="font-title-md text-title-md text-rose-500">🔥</span>
+                              <div className="flex flex-col">
+                                <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
+                                  86 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
+                                </span>
+                                <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                  tomato
+                                </span>
+                              </div>
+                            </div>
+                            <div className="absolute -top-3 right-6 h-2.5 w-2.5 rounded-full bg-rose-600 shadow-[0_0_12px_rgba(225,29,72,0.8)]" />
+                          </div>
+                          <div className="relative transition-all hover:scale-105">
+                            <div className="flex items-center gap-space-sm rounded-xl border border-slate-200/80 bg-white px-space-md py-space-xs text-slate-900 shadow-lg">
+                              <span className="font-title-md text-title-md text-rose-500">🔥</span>
+                              <div className="flex flex-col">
+                                <span className="font-headline-sm text-headline-sm leading-none text-slate-900">
+                                  34 <span className="font-body-sm text-body-sm text-slate-500">kcal</span>
+                                </span>
+                                <span className="font-label-sm text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                  lettuce
+                                </span>
+                              </div>
+                            </div>
+                            <div className="absolute -bottom-3 left-6 h-2.5 w-2.5 rounded-full bg-rose-600 shadow-[0_0_12px_rgba(225,29,72,0.8)]" />
                           </div>
                         </div>
-                        <div className="absolute -bottom-3 left-6 h-2.5 w-2.5 rounded-full bg-rose-600 shadow-[0_0_12px_rgba(225,29,72,0.8)]" />
+
+                        <div className="flex flex-wrap gap-space-xs pt-space-md">
+                          {MICRO_CHIPS.map((chip) => (
+                            <span
+                              key={chip.name}
+                              className="flex items-center gap-1 rounded-lg border border-slate-200/60 bg-white/95 px-space-sm py-1 font-label-sm text-xs font-medium text-slate-800 shadow-sm backdrop-blur-md"
+                            >
+                              <span className={`h-2 w-2 rounded-full ${chip.dot}`} /> {chip.kcal} kcal {chip.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="relative z-10 flex items-center justify-between border-t border-slate-200/80 bg-white/95 p-space-md backdrop-blur-md">
+                        <div className="flex items-center gap-space-sm">
+                          <Icon name="check_circle" className="text-[22px] text-emerald-600" />
+                          <span className="font-body-md text-body-md font-medium text-slate-800">
+                            6 ingredients identified automatically
+                          </span>
+                        </div>
+                        <button className="flex items-center gap-space-xs rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700">
+                          <Icon name="add_a_photo" className="text-[18px]" />
+                          Rescan Plate
+                        </button>
                       </div>
                     </div>
+                  )}
 
-                    <div className="flex flex-wrap gap-space-xs pt-space-md">
-                      {MICRO_CHIPS.map((chip) => (
-                        <span
-                          key={chip.name}
-                          className="flex items-center gap-1 rounded-lg border border-slate-200/60 bg-white/95 px-space-sm py-1 font-label-sm text-xs font-medium text-slate-800 shadow-sm backdrop-blur-md"
+                  {(mode === "barcode" || mode === "table") && (
+                    <div key={mode} className="animate-fade-up flex flex-1 flex-col items-center justify-center gap-space-md p-space-xl text-center">
+                      <span className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-700 bg-slate-800">
+                        <Icon name={mode === "barcode" ? "barcode_scanner" : "table_restaurant"} className="text-[32px] text-rose-400" />
+                      </span>
+                      <div>
+                        <p className="font-title-lg text-title-lg font-semibold text-white">
+                          {mode === "barcode" ? "Barcode reader" : "Food table recognition"}
+                        </p>
+                        <p className="mt-1 max-w-xs font-body-sm text-body-sm text-slate-400">
+                          Modul ini lagi dibangun — belum tersambung ke mesin deteksi. Coba &quot;Scan food&quot; atau &quot;Upload meal photo&quot; buat hasil beneran.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-label-sm text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                        Segera hadir
+                      </span>
+                    </div>
+                  )}
+
+                  {mode === "upload" && (
+                    <div key="upload" className="animate-fade-up flex flex-1 flex-col">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                      {!previewUrl && (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex flex-1 flex-col items-center justify-center gap-space-md p-space-xl text-center transition-colors hover:bg-slate-800/60"
                         >
-                          <span className={`h-2 w-2 rounded-full ${chip.dot}`} /> {chip.kcal} kcal {chip.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                          <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-600 bg-slate-800">
+                            <Icon name="upload_file" className="text-[32px] text-rose-400" />
+                          </span>
+                          <div>
+                            <p className="font-title-lg text-title-lg font-semibold text-white">Upload foto makanan</p>
+                            <p className="mt-1 font-body-sm text-body-sm text-slate-400">JPG/PNG · dianalisis oleh model deteksi asli</p>
+                          </div>
+                        </button>
+                      )}
 
-                  <div className="relative z-10 flex items-center justify-between border-t border-slate-200/80 bg-white/95 p-space-md backdrop-blur-md">
-                    <div className="flex items-center gap-space-sm">
-                      <Icon name="check_circle" className="text-[22px] text-emerald-600" />
-                      <span className="font-body-md text-body-md font-medium text-slate-800">
-                        6 ingredients identified automatically
-                      </span>
+                      {previewUrl && (
+                        <div className="relative flex-1">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img alt="Foto diupload" className="absolute inset-0 h-full w-full object-cover" src={previewUrl} />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-slate-950/30" />
+
+                          {isScanning && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-md">
+                              <span className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-rose-400" />
+                              <p className="font-label-sm text-xs font-bold uppercase tracking-widest text-white">Menganalisis foto…</p>
+                            </div>
+                          )}
+
+                          {!isScanning && scanError && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-space-md p-space-lg text-center">
+                              <Icon name="error" className="text-[32px] text-rose-400" />
+                              <p className="max-w-xs font-body-sm text-body-sm text-white">{scanError}</p>
+                              <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white transition-all hover:bg-rose-700"
+                              >
+                                Coba lagi
+                              </button>
+                            </div>
+                          )}
+
+                          {!isScanning && !scanError && scanResult && (
+                            <div className="animate-fade-up relative z-10 flex h-full flex-col justify-between p-space-lg">
+                              <div className="flex items-center gap-space-sm self-start rounded-full border border-slate-200/60 bg-white/95 px-space-md py-space-xs shadow-md backdrop-blur-md">
+                                <Icon name="check_circle" className="text-[18px] text-emerald-600" />
+                                <span className="font-label-sm text-[11px] font-bold uppercase tracking-widest text-slate-800">
+                                  Terdeteksi: {detected.name}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-space-xs self-end rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700"
+                              >
+                                <Icon name="add_a_photo" className="text-[18px]" />
+                                Upload foto lain
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <button className="flex items-center gap-space-xs rounded-full bg-rose-600 px-space-lg py-space-sm text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700">
-                      <Icon name="add_a_photo" className="text-[18px]" />
-                      Rescan Plate
-                    </button>
-                  </div>
+                  )}
                 </div>
 
                 {/* Right: breakdown panel */}
@@ -311,8 +527,8 @@ export function StudioDashboard() {
                         <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">
                           Detected Item
                         </span>
-                        <h3 className="mt-0.5 font-headline-md text-headline-md font-bold tracking-tight text-slate-900">
-                          Vegetable salad
+                        <h3 className="mt-0.5 font-headline-md text-headline-md font-bold tracking-tight text-slate-900 transition-all">
+                          {detected.name}
                         </h3>
                       </div>
                       <div className="flex items-center rounded-full border border-slate-200/80 bg-slate-100 p-1">
@@ -338,49 +554,86 @@ export function StudioDashboard() {
                         <span className="font-title-md text-title-md font-semibold text-slate-800">Calories</span>
                       </div>
                       <div className="flex items-baseline gap-1">
-                        <span className="font-metric-display text-metric-display font-bold tracking-tight text-slate-900">
-                          {qty * baseCalories}
+                        <span className="font-metric-display text-metric-display font-bold tracking-tight text-slate-900 transition-all">
+                          {detected.calories}
                         </span>
                         <span className="font-body-sm text-body-sm font-medium text-slate-500">kcal</span>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-space-md">
-                      <MacroBar label="Protein" grams="53g" pct={44} color="bg-rose-500" />
-                      <MacroBar label="Carbs" grams="156g" pct={68} color="bg-emerald-500" />
-                      <MacroBar label="Fat" grams="64g" pct={52} color="bg-blue-500" />
+                      <MacroBar label="Protein" grams={`${detected.protein.toFixed(0)}g`} pct={(detected.protein / macroTotal) * 100} color="bg-rose-500" />
+                      <MacroBar label="Carbs" grams={`${detected.carbs.toFixed(0)}g`} pct={(detected.carbs / macroTotal) * 100} color="bg-emerald-500" />
+                      <MacroBar label="Fat" grams={`${detected.fat.toFixed(0)}g`} pct={(detected.fat / macroTotal) * 100} color="bg-blue-500" />
                     </div>
 
-                    <div className="flex flex-col gap-space-sm pt-space-xs">
-                      <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                        Ingredients (kcal)
-                      </span>
-                      <div className="grid grid-cols-3 gap-2.5">
-                        {INGREDIENTS.map((ing) => (
-                          <div
-                            key={ing.label}
-                            className="flex flex-col items-center justify-center rounded-xl border border-slate-100 bg-slate-50 p-3 text-center"
-                          >
-                            <span className="font-headline-sm text-headline-sm font-bold text-slate-900">
-                              {ing.value}
-                            </span>
-                            <span className="font-label-sm text-[11px] font-medium capitalize text-slate-500">
-                              {ing.label}
-                            </span>
-                          </div>
-                        ))}
+                    {!scanResult && (
+                      <div className="flex flex-col gap-space-sm pt-space-xs">
+                        <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                          Ingredients (kcal)
+                        </span>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {INGREDIENTS.map((ing) => (
+                            <div
+                              key={ing.label}
+                              className="flex flex-col items-center justify-center rounded-xl border border-slate-100 bg-slate-50 p-3 text-center"
+                            >
+                              <span className="font-headline-sm text-headline-sm font-bold text-slate-900">
+                                {ing.value}
+                              </span>
+                              <span className="font-label-sm text-[11px] font-medium capitalize text-slate-500">
+                                {ing.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {scanResult && (
+                      <div className="animate-fade-up flex flex-col gap-space-sm pt-space-xs">
+                        <span className="font-label-sm text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                          Detail Scan
+                        </span>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
+                            <span className="font-headline-sm text-headline-sm font-bold text-slate-900">
+                              {detected.portion ? `${detected.portion.toFixed(0)}g` : "—"}
+                            </span>
+                            <p className="font-label-sm text-[11px] font-medium text-slate-500">Estimasi porsi</p>
+                          </div>
+                          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-center">
+                            <span className="font-headline-sm text-headline-sm font-bold text-slate-900">
+                              {detected.confidence !== null ? `${Math.round(detected.confidence * 100)}%` : "—"}
+                            </span>
+                            <p className="font-label-sm text-[11px] font-medium text-slate-500">Keyakinan</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-space-md pt-space-lg">
-                    <button className="flex w-full items-center justify-center gap-space-xs rounded-xl bg-slate-900 py-3 px-space-md text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow">
-                      <Icon name="check" className="text-[20px] text-emerald-400" />
-                      Confirm &amp; Log Meal
-                    </button>
-                    <button className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-700 transition-all hover:bg-slate-200">
-                      <Icon name="tune" className="text-[22px]" />
-                    </button>
+                  <div className="flex flex-col gap-space-sm pt-space-lg">
+                    <div className="flex items-center gap-space-md">
+                      <button
+                        onClick={scanResult ? handleConfirmLog : undefined}
+                        disabled={!scanResult || isConfirming || !!confirmedMsg}
+                        title={!scanResult ? "Data demo — upload foto asli buat log beneran" : undefined}
+                        className="flex w-full items-center justify-center gap-space-xs rounded-xl bg-slate-900 py-3 px-space-md text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-slate-900"
+                      >
+                        <Icon name={confirmedMsg ? "check_circle" : "check"} className="text-[20px] text-emerald-400" />
+                        {isConfirming ? "Menyimpan…" : confirmedMsg ? "Tersimpan" : "Confirm & Log Meal"}
+                      </button>
+                      <button className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-700 transition-all hover:bg-slate-200">
+                        <Icon name="tune" className="text-[22px]" />
+                      </button>
+                    </div>
+                    {confirmedMsg && (
+                      <p className="animate-fade-up flex items-center gap-1 font-label-sm text-xs font-semibold text-emerald-600">
+                        <Icon name="check_circle" className="text-[14px]" />
+                        {confirmedMsg}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
