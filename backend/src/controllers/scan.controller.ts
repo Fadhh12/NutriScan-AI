@@ -17,6 +17,7 @@ import {
 import { createDailyLog } from "../services/log.service";
 import { inferMealType } from "../utils/localTime";
 import type { MealType } from "../models/types";
+import type { NutritionBreakdown } from "../services/nutrition.service";
 
 async function assertValidImageDimensions(buffer: Buffer) {
   const metadata = await sharp(buffer).metadata();
@@ -83,6 +84,41 @@ export async function scanPhoto(req: Request, res: Response) {
     },
     201,
   );
+}
+
+/**
+ * Logs a meal that never went through the photo pipeline — barcode lookup
+ * (external nutrition already known) or manual pick from the food table
+ * (local dataset, looked up by name). Reuses the scans/scan_nutrition/
+ * daily_logs tables so history/dashboard show it exactly like a photo scan.
+ */
+export async function manualEntry(req: Request, res: Response) {
+  const { foodName, portionEstimateG, mealType, source, nutrition } = req.body as {
+    foodName: string;
+    portionEstimateG: number;
+    mealType?: MealType;
+    source: "barcode" | "table";
+    nutrition?: NutritionBreakdown;
+  };
+
+  const resolvedNutrition = nutrition ?? (await getNutritionForFood(foodName, portionEstimateG));
+
+  const userId = req.auth?.sub ?? null;
+  const scan = await createScan({
+    userId,
+    imageUrl: null,
+    detectedFoodName: foodName,
+    confidenceScore: 1,
+    portionEstimateG,
+    status: "confirmed",
+  });
+  const savedNutrition = await createScanNutrition(scan.id, resolvedNutrition);
+
+  if (userId) {
+    await createDailyLog({ userId, scanId: scan.id, mealType: mealType ?? inferMealType() });
+  }
+
+  return ok(res, { scan, nutrition: savedNutrition, source }, 201);
 }
 
 export async function getScan(req: Request, res: Response) {

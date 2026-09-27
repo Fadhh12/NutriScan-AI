@@ -5,10 +5,11 @@ import type { Scan, ScanNutrition, ScanStatus } from "../models/types";
 
 export async function createScan(input: {
   userId: string | null;
-  imageUrl: string;
+  imageUrl: string | null;
   detectedFoodName: string;
   confidenceScore: number;
   portionEstimateG: number;
+  status?: ScanStatus;
 }): Promise<Scan> {
   const { data, error } = await supabase
     .from("scans")
@@ -18,7 +19,7 @@ export async function createScan(input: {
       detected_food_name: input.detectedFoodName,
       confidence_score: input.confidenceScore,
       portion_estimate_g: input.portionEstimateG,
-      status: "pending" satisfies ScanStatus,
+      status: input.status ?? ("pending" satisfies ScanStatus),
     })
     .select()
     .single();

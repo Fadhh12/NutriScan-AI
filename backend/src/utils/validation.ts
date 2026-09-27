@@ -45,6 +45,23 @@ export const confirmScanSchema = z
     message: "Provide one of: confirmed, rejected, or foodName",
   });
 
+export const manualEntrySchema = z.object({
+  foodName: z.string().trim().min(1, "Food name is required"),
+  portionEstimateG: z.number().positive("Portion must be a positive number"),
+  mealType: mealTypeSchema.optional(),
+  source: z.enum(["barcode", "table"]),
+  nutrition: z
+    .object({
+      calories: z.number().nonnegative(),
+      proteinG: z.number().nonnegative(),
+      carbsG: z.number().nonnegative(),
+      fatG: z.number().nonnegative(),
+      fiberG: z.number().nonnegative().optional(),
+      sugarG: z.number().nonnegative().optional(),
+    })
+    .optional(),
+});
+
 export const updateTargetSchema = z.object({
   dailyCalorieTarget: z
     .number()
