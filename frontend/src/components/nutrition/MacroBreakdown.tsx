@@ -7,8 +7,8 @@ interface MacroBreakdownProps {
 
 const MACROS: Array<{ key: keyof MacroBreakdownProps; label: string; colorClass: string }> = [
   { key: "proteinG", label: "Protein", colorClass: "bg-accent" },
-  { key: "carbsG", label: "Karbo", colorClass: "bg-warning" },
-  { key: "fatG", label: "Lemak", colorClass: "bg-danger" },
+  { key: "carbsG", label: "Karbo", colorClass: "bg-secondary" },
+  { key: "fatG", label: "Lemak", colorClass: "bg-tertiary" },
   { key: "fiberG", label: "Serat", colorClass: "bg-muted" },
 ];
 
