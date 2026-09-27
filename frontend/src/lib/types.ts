@@ -101,6 +101,41 @@ export interface DashboardSummaryResponse {
   days: DaySummary[];
 }
 
+export interface FoodDatasetEntry {
+  name: string;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatPer100g: number;
+  fiberPer100g: number;
+  sugarPer100g: number;
+}
+
+export interface FoodsResponse {
+  foods: FoodDatasetEntry[];
+}
+
+export interface ManualEntryInput {
+  foodName: string;
+  portionEstimateG: number;
+  mealType?: MealType;
+  source: "barcode" | "table";
+  nutrition?: {
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+    fiberG?: number;
+    sugarG?: number;
+  };
+}
+
+export interface ManualEntryResponse {
+  scan: Scan;
+  nutrition: ScanNutrition;
+  source: "barcode" | "table";
+}
+
 export interface InsightResponse {
   content: string;
   date: string;

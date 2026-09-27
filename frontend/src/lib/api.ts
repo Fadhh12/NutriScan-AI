@@ -2,8 +2,11 @@ import type {
   AuthResponse,
   ConfirmScanResponse,
   DashboardSummaryResponse,
+  FoodsResponse,
   InsightResponse,
   LogsResponse,
+  ManualEntryInput,
+  ManualEntryResponse,
   PublicUser,
   ScanResponse,
 } from "./types";
@@ -84,6 +87,24 @@ export async function confirmScan(
     body: JSON.stringify(body),
   });
   return parseResponse<ConfirmScanResponse>(res);
+}
+
+export async function listFoods(query?: string): Promise<FoodsResponse> {
+  const qs = query ? `?q=${encodeURIComponent(query)}` : "";
+  const res = await fetch(`${API_BASE_URL}/foods${qs}`);
+  return parseResponse<FoodsResponse>(res);
+}
+
+export async function submitManualEntry(
+  input: ManualEntryInput,
+  token?: string | null,
+): Promise<ManualEntryResponse> {
+  const res = await fetch(`${API_BASE_URL}/scan/manual`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+  return parseResponse<ManualEntryResponse>(res);
 }
 
 export async function getLogs(date: string, token: string): Promise<LogsResponse> {
