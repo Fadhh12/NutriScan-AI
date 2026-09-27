@@ -28,7 +28,7 @@ export default function LoginPage() {
       const result =
         mode === "login" ? await login({ email, password }) : await register({ name, email, password });
       setSession(result.token, result.user);
-      router.push("/app");
+      router.push("/calorie-tracker");
     } catch (err) {
       setError(presentError(err).message);
     } finally {
@@ -108,7 +108,7 @@ export default function LoginPage() {
         {mode === "login" ? "Belum punya akun? Daftar" : "Sudah punya akun? Masuk"}
       </button>
 
-      <Link href="/app" className="text-center text-sm text-muted underline">
+      <Link href="/calorie-tracker" className="text-center text-sm text-muted underline">
         Lanjut sebagai Guest
       </Link>
     </main>

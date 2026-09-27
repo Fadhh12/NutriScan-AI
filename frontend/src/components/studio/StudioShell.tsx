@@ -117,7 +117,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <Link
-              href={token ? "/dashboard" : "/login"}
+              href={token ? "/calorie-tracker" : "/login"}
               className="hidden items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700 hover:shadow-md sm:inline-flex md:px-5 md:py-2.5 md:text-sm"
             >
               {token ? "Buka Dashboard" : "Get Started Free"}
@@ -168,7 +168,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      <main className="min-h-[calc(100vh-140px)] w-full bg-[#F8FAFC] pt-16 md:pt-20">
+      <main className="min-h-[calc(100vh-140px)] w-full bg-[#F8FAFC] pb-24 pt-16 md:pb-0 md:pt-20">
         <div className="flex w-full flex-col">
           <div className="flex w-full flex-wrap items-center gap-space-sm border-b border-slate-200/80 bg-white px-4 py-3 sm:px-margin sm:py-3.5">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 font-label-md text-label-md font-semibold text-emerald-700">
@@ -185,6 +185,25 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </main>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-slate-200/80 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_6px_rgba(15,23,42,0.05)] backdrop-blur-xl md:hidden">
+        {STUDIO_NAV_LINKS.map((link) => {
+          const isActive = pathname === link.href;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              aria-current={isActive ? "page" : undefined}
+              className={`flex flex-col items-center justify-center gap-0.5 py-2 transition-colors ${
+                isActive ? "text-rose-600" : "text-slate-500"
+              }`}
+            >
+              <Icon name={link.icon} className="text-[20px]" />
+              <span className="font-label-sm text-[9px] font-semibold leading-none">{link.shortLabel}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
