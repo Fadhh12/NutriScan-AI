@@ -2,6 +2,7 @@ import { supabase } from "../config/supabase";
 import { foodDataset } from "../data/foodDataset";
 import { logger } from "../utils/logger";
 import type { FoodReference } from "../models/types";
+import type { NutritionPer100g } from "./foodRecognition.service";
 
 export interface NutritionBreakdown {
   calories: number;
@@ -14,6 +15,18 @@ export interface NutritionBreakdown {
 
 function scale(per100g: number, portionG: number): number {
   return Number(((per100g * portionG) / 100).toFixed(1));
+}
+
+/** Scales a per-100g estimate (e.g. straight from the vision model) to the estimated portion. */
+export function scaleNutritionPer100g(per100g: NutritionPer100g, portionG: number): NutritionBreakdown {
+  return {
+    calories: scale(per100g.calories, portionG),
+    proteinG: scale(per100g.proteinG, portionG),
+    carbsG: scale(per100g.carbsG, portionG),
+    fatG: scale(per100g.fatG, portionG),
+    fiberG: scale(per100g.fiberG, portionG),
+    sugarG: scale(per100g.sugarG, portionG),
+  };
 }
 
 async function findCachedReference(foodName: string): Promise<FoodReference | null> {

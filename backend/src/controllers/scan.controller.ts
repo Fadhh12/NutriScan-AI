@@ -3,8 +3,8 @@ import type { Request, Response } from "express";
 import { env } from "../config/env";
 import { AppError } from "../utils/AppError";
 import { ok } from "../utils/response";
-import { recognizeWithTimeout } from "../services/foodRecognition.service";
-import { getNutritionForFood } from "../services/nutrition.service";
+import { recognizeWithTimeout, type FoodCandidate } from "../services/foodRecognition.service";
+import { getNutritionForFood, scaleNutritionPer100g } from "../services/nutrition.service";
 import { uploadScanPhoto } from "../services/storage.service";
 import {
   assertScanAccessible,
@@ -41,13 +41,15 @@ export async function scanPhoto(req: Request, res: Response) {
   const userId = req.auth?.sub ?? null;
   const imageUrl = await uploadScanPhoto(req.file.buffer, req.file.mimetype, userId);
 
-  const recognition = await recognizeWithTimeout(req.file.buffer);
+  const recognition = await recognizeWithTimeout(req.file.buffer, req.file.mimetype);
   if (!recognition.isFood || recognition.candidates.length === 0) {
     throw new AppError("Tidak terdeteksi makanan, coba foto ulang", 422, "NOT_FOOD");
   }
 
   const [primary, ...alternatives] = recognition.candidates;
-  const nutrition = await getNutritionForFood(primary.name, primary.portionEstimateG);
+  const nutrition = primary.nutrition100g
+    ? scaleNutritionPer100g(primary.nutrition100g, primary.portionEstimateG)
+    : await getNutritionForFood(primary.name, primary.portionEstimateG);
 
   const scan = await createScan({
     userId,
@@ -65,11 +67,13 @@ export async function scanPhoto(req: Request, res: Response) {
 
   if (isLowConfidence) {
     candidates = await Promise.all(
-      [{ ...primary }, ...alternatives].map(async (c) => ({
+      [{ ...primary }, ...alternatives].map(async (c: FoodCandidate) => ({
         name: c.name,
         confidence: c.confidence,
         portionEstimateG: c.portionEstimateG,
-        nutrition: await getNutritionForFood(c.name, c.portionEstimateG),
+        nutrition: c.nutrition100g
+          ? scaleNutritionPer100g(c.nutrition100g, c.portionEstimateG)
+          : await getNutritionForFood(c.name, c.portionEstimateG),
       })),
     );
   }

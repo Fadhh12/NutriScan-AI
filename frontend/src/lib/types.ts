@@ -103,6 +103,7 @@ export interface DashboardSummaryResponse {
 
 export interface FoodDatasetEntry {
   name: string;
+  category: string;
   caloriesPer100g: number;
   proteinPer100g: number;
   carbsPer100g: number;

@@ -3,10 +3,22 @@ import { foodDataset } from "../data/foodDataset";
 import { logger } from "../utils/logger";
 import { AppError } from "../utils/AppError";
 
+export interface NutritionPer100g {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  fiberG: number;
+  sugarG: number;
+}
+
 export interface FoodCandidate {
   name: string;
   confidence: number;
   portionEstimateG: number;
+  /** Only set by providers that estimate composition directly from the photo (e.g. Gemini) —
+   * lets the caller skip the local-dataset name lookup and use the model's own estimate. */
+  nutrition100g?: NutritionPer100g;
 }
 
 export interface RecognitionResult {
@@ -15,7 +27,7 @@ export interface RecognitionResult {
 }
 
 export interface FoodRecognitionProvider {
-  recognize(imageBuffer: Buffer): Promise<RecognitionResult>;
+  recognize(imageBuffer: Buffer, mimeType?: string): Promise<RecognitionResult>;
 }
 
 function hashBuffer(buffer: Buffer): number {
@@ -30,7 +42,8 @@ function hashBuffer(buffer: Buffer): number {
  * Deterministic mock provider: derives a pseudo-random but reproducible
  * result from the image bytes, so the same photo always yields the same
  * demo result. Lets the whole scan -> confirm -> log flow work end-to-end
- * without a paid/rate-limited 3rd-party API key.
+ * without a configured vision API, and doubles as the fallback when the
+ * real provider errors out or times out (see recognizeWithTimeout below).
  */
 class MockFoodRecognitionProvider implements FoodRecognitionProvider {
   async recognize(imageBuffer: Buffer): Promise<RecognitionResult> {
@@ -111,9 +124,121 @@ class LogMealFoodRecognitionProvider implements FoodRecognitionProvider {
   }
 }
 
+interface GeminiFoodItem {
+  name?: unknown;
+  confidence?: unknown;
+  portionEstimateG?: unknown;
+  caloriesPer100g?: unknown;
+  proteinPer100g?: unknown;
+  carbsPer100g?: unknown;
+  fatPer100g?: unknown;
+  fiberPer100g?: unknown;
+  sugarPer100g?: unknown;
+}
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * Real vision-based food recognition using the Gemini multimodal API
+ * (aistudio.google.com free tier, same GEMINI_API_KEY used by the AI
+ * insight feature). Sends the uploaded photo directly to the model and
+ * asks it to both identify the food AND estimate its macro composition,
+ * so recognition doesn't depend on the name matching an entry in the
+ * local dataset (see NutritionPer100g on FoodCandidate).
+ */
+class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
+  async recognize(imageBuffer: Buffer, mimeType = "image/jpeg"): Promise<RecognitionResult> {
+    if (!env.geminiApiKey) {
+      throw new AppError("Gemini API key not configured (GEMINI_API_KEY)", 500, "PROVIDER_NOT_CONFIGURED");
+    }
+
+    const knownNames = foodDataset.slice(0, 60).map((f) => f.name).join(", ");
+    const prompt = [
+      "Kamu adalah sistem computer vision untuk aplikasi tracking kalori makanan Indonesia.",
+      "Lihat foto ini dan tentukan apakah ada makanan/minuman di dalamnya.",
+      `Jika ada beberapa jenis makanan berbeda dalam satu foto, urutkan dari yang paling dominan/utama. Kalau nama makanannya mirip salah satu dari daftar referensi ini, pakai persis nama itu (case-sensitive match tidak wajib tapi ejaan harus sama): ${knownNames}, dst. Kalau tidak ada yang cocok, kasih nama makanan yang jelas dan umum (boleh Bahasa Indonesia atau Inggris).`,
+      "Balas HANYA dengan JSON valid, tanpa markdown, tanpa teks lain, dengan skema persis:",
+      '{"isFood": boolean, "items": [{"name": string, "confidence": number (0-1), "portionEstimateG": number, "caloriesPer100g": number, "proteinPer100g": number, "carbsPer100g": number, "fatPer100g": number, "fiberPer100g": number, "sugarPer100g": number}]}',
+      "Maksimal 3 item, urutkan dari confidence tertinggi. Kalau foto bukan makanan/minuman sama sekali, balas {\"isFood\": false, \"items\": []}.",
+    ].join("\n\n");
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel}:generateContent?key=${env.geminiApiKey}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType, data: imageBuffer.toString("base64") } },
+            ],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: 800,
+          temperature: 0.2,
+          responseMimeType: "application/json",
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      logger.error("Gemini food recognition request failed", { status: res.status, body });
+      throw new AppError(`Gemini vision request failed: ${res.status}`, 502, "PROVIDER_ERROR");
+    }
+
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const text = data.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text ?? "")
+      .join("")
+      .trim();
+
+    if (!text) {
+      throw new AppError("Gemini returned an empty response", 502, "PROVIDER_ERROR");
+    }
+
+    let parsed: { isFood?: unknown; items?: GeminiFoodItem[] };
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      logger.error("Gemini food recognition returned non-JSON response", { text });
+      throw new AppError("Gemini returned an unparseable response", 502, "PROVIDER_ERROR");
+    }
+
+    if (!parsed.isFood || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+      return { isFood: false, candidates: [] };
+    }
+
+    const candidates: FoodCandidate[] = parsed.items.slice(0, 3).map((item) => ({
+      name: typeof item.name === "string" && item.name.trim() ? item.name.trim() : "Makanan tidak dikenal",
+      confidence: Math.min(1, Math.max(0, num(item.confidence, 0.5))),
+      portionEstimateG: Math.max(1, num(item.portionEstimateG, 150)),
+      nutrition100g: {
+        calories: Math.max(0, num(item.caloriesPer100g, 150)),
+        proteinG: Math.max(0, num(item.proteinPer100g, 5)),
+        carbsG: Math.max(0, num(item.carbsPer100g, 20)),
+        fatG: Math.max(0, num(item.fatPer100g, 5)),
+        fiberG: Math.max(0, num(item.fiberPer100g, 1)),
+        sugarG: Math.max(0, num(item.sugarPer100g, 2)),
+      },
+    }));
+
+    return { isFood: true, candidates };
+  }
+}
+
 const providers: Record<string, FoodRecognitionProvider> = {
   mock: new MockFoodRecognitionProvider(),
   logmeal: new LogMealFoodRecognitionProvider(),
+  gemini: new GeminiFoodRecognitionProvider(),
 };
 
 export function getFoodRecognitionProvider(): FoodRecognitionProvider {
@@ -125,13 +250,35 @@ export function getFoodRecognitionProvider(): FoodRecognitionProvider {
   return provider;
 }
 
-export async function recognizeWithTimeout(imageBuffer: Buffer): Promise<RecognitionResult> {
-  const provider = getFoodRecognitionProvider();
-
+async function recognizeWithProvider(
+  provider: FoodRecognitionProvider,
+  imageBuffer: Buffer,
+  mimeType: string | undefined,
+): Promise<RecognitionResult> {
   return Promise.race([
-    provider.recognize(imageBuffer),
+    provider.recognize(imageBuffer, mimeType),
     new Promise<RecognitionResult>((_resolve, reject) => {
       setTimeout(() => reject(new AppError("Recognition service timed out", 504, "PROVIDER_TIMEOUT")), env.scanTimeoutMs);
     }),
   ]);
+}
+
+/**
+ * Runs the configured provider, with an automatic fallback to the mock
+ * provider if it errors or times out — a real vision API being briefly
+ * rate-limited or down shouldn't take down the whole scan feature.
+ */
+export async function recognizeWithTimeout(imageBuffer: Buffer, mimeType?: string): Promise<RecognitionResult> {
+  const provider = getFoodRecognitionProvider();
+
+  try {
+    return await recognizeWithProvider(provider, imageBuffer, mimeType);
+  } catch (err) {
+    if (provider === providers.mock) throw err;
+    logger.warn("Food recognition provider failed, falling back to mock", {
+      provider: env.foodRecognitionProvider,
+      err: String(err),
+    });
+    return recognizeWithProvider(providers.mock, imageBuffer, mimeType);
+  }
 }
