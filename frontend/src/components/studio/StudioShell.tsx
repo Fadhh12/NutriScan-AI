@@ -4,18 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { STUDIO_NAV_LINKS } from "@/lib/studioNav";
 
 export function Icon({ name, className = "" }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
-
-export const STUDIO_NAV_LINKS = [
-  { label: "AI Scanner", href: "/scanner" },
-  { label: "Calorie Tracker", href: "/calorie-tracker" },
-  { label: "Custom Plan", href: "/custom-plan" },
-  { label: "Dashboard & Analytics", href: "/analytics" },
-  { label: "Activity Tracker", href: "/activity" },
-];
 
 export function ModuleBadge({
   moduleLabel,
