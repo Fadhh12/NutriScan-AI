@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { getDashboardSummary } from "@/lib/api";
 import { STUDIO_NAV_LINKS } from "@/lib/studioNav";
 
 export function Icon({ name, className = "" }: { name: string; className?: string }) {
@@ -38,6 +39,22 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { token } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [calStats, setCalStats] = useState<{ consumed: number; target: number } | null>(null);
+
+  useEffect(() => {
+    function load() {
+      if (!token) {
+        setCalStats(null);
+        return;
+      }
+      getDashboardSummary(token)
+        .then((res) => setCalStats({ consumed: Math.round(res.today.calories), target: res.target }))
+        .catch(() => setCalStats(null));
+    }
+    load();
+  }, [token]);
+
+  const deficit = calStats ? calStats.consumed - calStats.target : null;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-body-md text-[#0F172A] antialiased selection:bg-rose-100 selection:text-rose-900">
@@ -78,21 +95,27 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-space-sm md:gap-space-md">
-            <div className="hidden items-center gap-space-md rounded-xl border border-slate-200/70 bg-slate-100/80 px-3.5 py-1.5 lg:flex">
-              <div className="flex flex-col items-end">
-                <span className="font-label-sm text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Target Cal
-                </span>
-                <span className="text-sm font-bold text-emerald-700">1,840 / 2,400</span>
+            {calStats && (
+              <div className="hidden items-center gap-space-md rounded-xl border border-slate-200/70 bg-slate-100/80 px-3.5 py-1.5 lg:flex">
+                <div className="flex flex-col items-end">
+                  <span className="font-label-sm text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Target Cal
+                  </span>
+                  <span className="text-sm font-bold text-emerald-700">
+                    {calStats.consumed.toLocaleString("id-ID")} / {calStats.target.toLocaleString("id-ID")}
+                  </span>
+                </div>
+                <div className="h-6 w-px bg-slate-300" />
+                <div className="flex flex-col">
+                  <span className="font-label-sm text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    {deficit !== null && deficit > 0 ? "Surplus" : "Deficit"}
+                  </span>
+                  <span className={`text-sm font-bold ${deficit !== null && deficit > 0 ? "text-amber-600" : "text-rose-600"}`}>
+                    {deficit !== null ? `${deficit > 0 ? "+" : ""}${deficit.toLocaleString("id-ID")} kcal` : "—"}
+                  </span>
+                </div>
               </div>
-              <div className="h-6 w-px bg-slate-300" />
-              <div className="flex flex-col">
-                <span className="font-label-sm text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Deficit
-                </span>
-                <span className="text-sm font-bold text-rose-600">-560 kcal</span>
-              </div>
-            </div>
+            )}
             <Link
               href={token ? "/dashboard" : "/login"}
               className="hidden items-center justify-center rounded-full bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-rose-700 hover:shadow-md sm:inline-flex md:px-5 md:py-2.5 md:text-sm"
