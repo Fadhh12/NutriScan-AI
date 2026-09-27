@@ -159,6 +159,14 @@ export interface InsightResponse {
   cached: boolean;
 }
 
+export interface PlanRecommendationResponse {
+  recommendedCalories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  rationale: string;
+}
+
 export type ActivityType = "walking" | "running" | "cycling" | "weightlifting" | "swimming" | "yoga" | "other";
 export type ActivityIntensity = "low" | "medium" | "high";
 

@@ -12,6 +12,7 @@ import type {
   LogsResponse,
   ManualEntryInput,
   ManualEntryResponse,
+  PlanRecommendationResponse,
   PublicUser,
   ScanResponse,
 } from "./types";
@@ -139,6 +140,13 @@ export async function getDashboardInsight(token: string): Promise<InsightRespons
     headers: authHeaders(token),
   });
   return parseResponse<InsightResponse>(res);
+}
+
+export async function getPlanRecommendation(token: string): Promise<PlanRecommendationResponse> {
+  const res = await fetch(`${API_BASE_URL}/dashboard/plan`, {
+    headers: authHeaders(token),
+  });
+  return parseResponse<PlanRecommendationResponse>(res);
 }
 
 export async function getActivities(date: string, token: string): Promise<ActivitiesResponse> {
