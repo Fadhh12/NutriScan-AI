@@ -24,6 +24,7 @@ export const env = {
   logMealBaseUrl: process.env.LOGMEAL_BASE_URL ?? "https://api.logmeal.com/v2",
 
   aiInsightProvider: process.env.AI_INSIGHT_PROVIDER ?? "mock",
+  aiChatProvider: process.env.AI_CHAT_PROVIDER ?? "mock",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.8-flash",
 

@@ -71,6 +71,15 @@ export const logActivitySchema = z.object({
   durationMinutes: z.number().int().min(1, "Duration must be at least 1 minute").max(600, "Duration must be at most 600 minutes"),
 });
 
+export const chatMessageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1, "Message can't be empty").max(2000, "Message is too long"),
+});
+
+export const chatSchema = z.object({
+  messages: z.array(chatMessageSchema).min(1, "At least one message is required").max(20, "Conversation is too long"),
+});
+
 export const updateTargetSchema = z.object({
   dailyCalorieTarget: z
     .number()

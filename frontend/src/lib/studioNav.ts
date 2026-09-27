@@ -4,4 +4,5 @@ export const STUDIO_NAV_LINKS = [
   { label: "Custom Plan", href: "/custom-plan" },
   { label: "Dashboard & Analytics", href: "/analytics" },
   { label: "Activity Tracker", href: "/activity" },
+  { label: "AI Coach", href: "/coach" },
 ];

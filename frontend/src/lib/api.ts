@@ -2,6 +2,8 @@ import type {
   Activity,
   ActivitiesResponse,
   AuthResponse,
+  ChatMessage,
+  ChatResponse,
   ConfirmScanResponse,
   DashboardSummaryResponse,
   FoodsResponse,
@@ -161,6 +163,15 @@ export async function deleteActivity(id: string, token: string): Promise<void> {
     headers: authHeaders(token),
   });
   await parseResponse<{ deleted: boolean }>(res);
+}
+
+export async function sendChatMessage(messages: ChatMessage[], token: string): Promise<ChatResponse> {
+  const res = await fetch(`${API_BASE_URL}/ai/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ messages }),
+  });
+  return parseResponse<ChatResponse>(res);
 }
 
 export async function updateTarget(dailyCalorieTarget: number, token: string): Promise<PublicUser> {

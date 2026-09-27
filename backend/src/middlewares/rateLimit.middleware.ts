@@ -18,3 +18,13 @@ export const scanRateLimiter = rateLimit({
   keyGenerator: (req) => req.auth?.sub ?? req.ip ?? "unknown",
   message: { success: false, error: { message: "Please wait a moment before scanning again" } },
 });
+
+/** Throttles the AI Coach chat endpoint to protect the Gemini free-tier quota from rapid-fire messages. */
+export const chatRateLimiter = rateLimit({
+  windowMs: 10 * 1000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.auth?.sub ?? req.ip ?? "unknown",
+  message: { success: false, error: { message: "Tunggu sebentar sebelum kirim pesan lagi" } },
+});

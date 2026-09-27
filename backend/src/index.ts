@@ -17,5 +17,5 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 app.listen(env.port, () => {
-  logger.info(`NutriScan AI backend listening on port ${env.port}`, { env: env.nodeEnv });
+  logger.info(`NutriScan AI backend listening on port ${env.port}`, { env: env.nodeEnv, aiChatProvider: env.aiChatProvider });
 });
