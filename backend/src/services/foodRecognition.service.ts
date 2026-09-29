@@ -140,6 +140,45 @@ function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const GEMINI_MAX_ATTEMPTS = 3;
+
+/**
+ * Gemini occasionally returns 503 "high demand" for a request or two and then
+ * recovers — retrying those (and other transient 5xx/429) instead of giving
+ * up immediately avoids silently falling back to the mock provider (which
+ * would show the user a confident but unrelated food guess) for what's
+ * usually a few-hundred-ms blip.
+ */
+async function fetchGeminiWithRetry(url: string, body: string): Promise<Response> {
+  for (let attempt = 1; attempt <= GEMINI_MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+    if (res.ok) return res;
+
+    const status = res.status;
+    const responseBody = await res.text().catch(() => "");
+
+    if (!RETRYABLE_STATUSES.has(status) || attempt === GEMINI_MAX_ATTEMPTS) {
+      logger.error("Gemini food recognition request failed", { status, body: responseBody, attempt });
+      throw new AppError(`Gemini vision request failed: ${status}`, 502, "PROVIDER_ERROR");
+    }
+
+    logger.warn("Gemini food recognition request failed, retrying", { status, attempt });
+    await sleep(attempt * 500);
+  }
+
+  throw new AppError("Gemini vision request failed", 502, "PROVIDER_ERROR");
+}
+
 /**
  * Real vision-based food recognition using the Gemini multimodal API
  * (aistudio.google.com free tier, same GEMINI_API_KEY used by the AI
@@ -168,10 +207,9 @@ class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel}:generateContent?key=${env.geminiApiKey}`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await fetchGeminiWithRetry(
+      url,
+      JSON.stringify({
         contents: [
           {
             parts: [
@@ -187,13 +225,7 @@ class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
           thinkingConfig: { thinkingBudget: 0 },
         },
       }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      logger.error("Gemini food recognition request failed", { status: res.status, body });
-      throw new AppError(`Gemini vision request failed: ${res.status}`, 502, "PROVIDER_ERROR");
-    }
+    );
 
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -266,9 +298,13 @@ async function recognizeWithProvider(
 }
 
 /**
- * Runs the configured provider, with an automatic fallback to the mock
- * provider if it errors or times out — a real vision API being briefly
- * rate-limited or down shouldn't take down the whole scan feature.
+ * Runs the configured provider. Only falls back to the mock provider when
+ * it isn't configured at all (PROVIDER_NOT_CONFIGURED, e.g. no API key set
+ * yet) — that's a setup gap, not a real answer, so a demo placeholder is
+ * fine. A real request failure (timeout, 5xx after retries) is rethrown
+ * instead of silently swapped for a mock guess: showing the user an
+ * unrelated "detected" food with a fake confidence score is worse than
+ * asking them to retry the scan.
  */
 export async function recognizeWithTimeout(imageBuffer: Buffer, mimeType?: string): Promise<RecognitionResult> {
   const provider = getFoodRecognitionProvider();
@@ -276,8 +312,9 @@ export async function recognizeWithTimeout(imageBuffer: Buffer, mimeType?: strin
   try {
     return await recognizeWithProvider(provider, imageBuffer, mimeType);
   } catch (err) {
-    if (provider === providers.mock) throw err;
-    logger.warn("Food recognition provider failed, falling back to mock", {
+    const isNotConfigured = err instanceof AppError && err.code === "PROVIDER_NOT_CONFIGURED";
+    if (provider === providers.mock || !isNotConfigured) throw err;
+    logger.warn("Food recognition provider not configured, falling back to mock", {
       provider: env.foodRecognitionProvider,
       err: String(err),
     });
