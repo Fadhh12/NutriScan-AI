@@ -8,8 +8,10 @@ import { router } from "./routes";
 
 const app = express();
 
+const corsOrigin = env.corsOrigin === "*" ? true : env.corsOrigin.split(",").map((origin) => origin.trim());
+
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 app.use("/api", router);
 

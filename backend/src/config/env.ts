@@ -19,6 +19,8 @@ export const env = {
   jwtSecret: required("JWT_SECRET", "dev-secret-change-me"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
 
+  corsOrigin: process.env.CORS_ORIGIN ?? "*",
+
   foodRecognitionProvider: process.env.FOOD_RECOGNITION_PROVIDER ?? "mock",
   logMealApiKey: process.env.LOGMEAL_API_KEY ?? "",
   logMealBaseUrl: process.env.LOGMEAL_BASE_URL ?? "https://api.logmeal.com/v2",
