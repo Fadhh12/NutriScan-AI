@@ -193,7 +193,10 @@ class GeminiFoodRecognitionProvider implements FoodRecognitionProvider {
       throw new AppError("Gemini API key not configured (GEMINI_API_KEY)", 500, "PROVIDER_NOT_CONFIGURED");
     }
 
-    const knownNames = foodDataset.slice(0, 60).map((f) => f.name).join(", ");
+    // Full dataset (300+ names as of this writing) so Gemini can match spelling
+    // for any of it, not just an arbitrary first slice — the list is names only
+    // (no macros), so it stays a small fraction of the model's input budget.
+    const knownNames = foodDataset.map((f) => f.name).join(", ");
     const prompt = [
       "Kamu adalah sistem computer vision untuk aplikasi tracking kalori makanan Indonesia, setara ahli gizi yang menganalisis foto piring makanan.",
       "Lihat foto ini dengan teliti. Piring/nampan sering berisi BEBERAPA komponen makanan berbeda sekaligus (misalnya: nasi + ayam + telur + kentang + sayur di satu piring). Identifikasi SETIAP komponen yang terlihat SECARA TERPISAH, satu per satu — jangan cuma sebutkan satu item yang paling dominan/besar dan mengabaikan sisanya. Contoh: kalau ada nasi, ayam goreng, dan lalapan di piring yang sama, itu HARUS jadi 3 item terpisah di array, bukan 1 item gabungan.",
