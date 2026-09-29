@@ -91,6 +91,30 @@ Dashboard nampilin insight harian dari LLM berdasarkan data 7 hari terakhir (kal
 - `AI_INSIGHT_PROVIDER=mock` (default) — deterministik, jalan tanpa API key apapun.
 - `AI_INSIGHT_PROVIDER=gemini` + `GEMINI_API_KEY` (gratis di [aistudio.google.com](https://aistudio.google.com/app/apikey)) — insight beneran dari Gemini.
 
+## Deploy
+
+### Backend + Cron (Render)
+
+Repo punya [`render.yaml`](render.yaml) (Render Blueprint) yang bikin dua service sekaligus:
+
+1. `nutriscan-backend` — web service, `npm run build` lalu `npm start`, health check di `/api/health`.
+2. `nutriscan-photo-cleanup` — cron job harian (`0 19 * * *` UTC = 02:00 WIB) yang jalanin retensi foto (SRS 2.3), pengganti `npm run cleanup:photos` manual.
+
+Cara pakai:
+
+1. Push repo ini ke GitHub (udah).
+2. Di [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**, pilih repo ini.
+3. Render baca `render.yaml` otomatis, bikin kedua service. Env var yang ditandai `sync: false` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGIN`, `GEMINI_API_KEY`) harus diisi manual di dashboard — isinya sama kayak `backend/.env` lokal. `JWT_SECRET` di-generate otomatis oleh Render.
+4. Set `CORS_ORIGIN` ke URL frontend (langkah berikutnya) setelah itu ke-deploy.
+
+### Frontend (Vercel)
+
+Next.js paling gampang di Vercel (zero-config):
+
+1. [Vercel Dashboard](https://vercel.com/new) → import repo ini, set **Root Directory** ke `frontend`.
+2. Env var: `NEXT_PUBLIC_API_BASE_URL` = URL backend Render + `/api` (misal `https://nutriscan-backend.onrender.com/api`).
+3. Deploy. Setelah dapet domain Vercel-nya, balik ke Render dan set `CORS_ORIGIN` backend ke domain itu.
+
 ## Progres Pengerjaan
 
 Lihat [`docs/`](docs/) untuk dokumentasi tiap fase (sesuai Task Breakdown di dokumen PRD/SRS/SDD).

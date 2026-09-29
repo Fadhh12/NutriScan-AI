@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: nutriscan-backend
+    env: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: scan-photos
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
+      - key: FOOD_RECOGNITION_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: AI_INSIGHT_PROVIDER
+        value: gemini
+      - key: AI_CHAT_PROVIDER
+        value: gemini
+      - key: MAX_UPLOAD_SIZE_BYTES
+        value: 8388608
+      - key: MIN_IMAGE_DIMENSION_PX
+        value: 300
+      - key: LOW_CONFIDENCE_THRESHOLD
+        value: 0.6
+      - key: SCAN_TIMEOUT_MS
+        value: 10000
+      - key: PHOTO_RETENTION_DAYS
+        value: 30
+
+  - type: cron
+    name: nutriscan-photo-cleanup
+    env: node
+    rootDir: backend
+    plan: starter
+    schedule: "0 19 * * *"
+    buildCommand: npm install && npm run build
+    startCommand: node dist/jobs/cleanupOldPhotos.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: scan-photos
+      - key: PHOTO_RETENTION_DAYS
+        value: 30
