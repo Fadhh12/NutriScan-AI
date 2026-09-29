@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "cleanup:photos": "tsx src/jobs/cleanupOldPhotos.ts",
     "test:e2e": "tsx src/scripts/e2eSmoke.ts",
     "seed:demo": "tsx src/scripts/seedDemoData.ts"
@@ -34,6 +35,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.5.4",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^5.0.2"
   }
 }
