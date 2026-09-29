@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
+import { AppError } from "../utils/AppError";
 import type { DaySummary } from "./log.service";
 import type { ActivitySummary } from "./activity.service";
 
@@ -80,10 +81,42 @@ const SYSTEM_PROMPT_HEADER = [
  * elsewhere). Uses systemInstruction for persona + injected user data, and
  * maps the chat history into Gemini's user/model turn format.
  */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const GEMINI_CHAT_MAX_ATTEMPTS = 3;
+
+async function fetchGeminiChatWithRetry(url: string, body: string): Promise<Response> {
+  for (let attempt = 1; attempt <= GEMINI_CHAT_MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+    if (res.ok) return res;
+
+    const status = res.status;
+    const responseBody = await res.text().catch(() => "");
+
+    if (!RETRYABLE_STATUSES.has(status) || attempt === GEMINI_CHAT_MAX_ATTEMPTS) {
+      logger.error("Gemini chat request failed", { status, body: responseBody, attempt });
+      throw new AppError(`Gemini chat request failed: ${status}`, 502, "PROVIDER_ERROR");
+    }
+
+    logger.warn("Gemini chat request failed, retrying", { status, attempt });
+    await sleep(attempt * 500);
+  }
+
+  throw new AppError("Gemini chat request failed", 502, "PROVIDER_ERROR");
+}
+
 class GeminiChatProvider implements AiChatProvider {
   async reply(messages: ChatMessage[], context: ChatContext): Promise<string> {
     if (!env.geminiApiKey) {
-      throw new Error("Gemini API key not configured (GEMINI_API_KEY)");
+      throw new AppError("Gemini API key not configured (GEMINI_API_KEY)", 500, "PROVIDER_NOT_CONFIGURED");
     }
 
     const systemInstruction = `${SYSTEM_PROMPT_HEADER}\n\nData user saat ini:\n${buildContextSummary(context)}`;
@@ -93,10 +126,9 @@ class GeminiChatProvider implements AiChatProvider {
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiModel}:generateContent?key=${env.geminiApiKey}`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const res = await fetchGeminiChatWithRetry(
+      url,
+      JSON.stringify({
         systemInstruction: { parts: [{ text: systemInstruction }] },
         contents: recentMessages.map((m) => ({
           role: m.role === "assistant" ? "model" : "user",
@@ -104,13 +136,7 @@ class GeminiChatProvider implements AiChatProvider {
         })),
         generationConfig: { maxOutputTokens: 900, temperature: 0.6, thinkingConfig: { thinkingBudget: 0 } },
       }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      logger.error("Gemini chat request failed", { status: res.status, body });
-      throw new Error(`Gemini chat request failed: ${res.status}`);
-    }
+    );
 
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -121,7 +147,7 @@ class GeminiChatProvider implements AiChatProvider {
       .trim();
 
     if (!text) {
-      throw new Error("Gemini returned an empty chat response");
+      throw new AppError("Gemini returned an empty chat response", 502, "PROVIDER_ERROR");
     }
     return text;
   }
@@ -141,13 +167,21 @@ function getProvider(): AiChatProvider {
   return provider;
 }
 
+/**
+ * Only falls back to the mock reply when Gemini genuinely isn't configured
+ * (no API key). A real request failure (timeout, 5xx after retries) is
+ * rethrown instead of silently replaced by the mock's canned numbers-recap
+ * reply — that reply looks like a real answer but ignores whatever the user
+ * actually asked, which is misleading when it's standing in for an outage.
+ */
 export async function getChatReply(messages: ChatMessage[], context: ChatContext): Promise<string> {
   const provider = getProvider();
   try {
     return await provider.reply(messages, context);
   } catch (err) {
-    if (provider === providers.mock) throw err;
-    logger.warn("AI chat provider failed, falling back to mock", { provider: env.aiChatProvider, err: String(err) });
+    const isNotConfigured = err instanceof AppError && err.code === "PROVIDER_NOT_CONFIGURED";
+    if (provider === providers.mock || !isNotConfigured) throw err;
+    logger.warn("AI chat provider not configured, falling back to mock", { provider: env.aiChatProvider, err: String(err) });
     return providers.mock.reply(messages, context);
   }
 }
