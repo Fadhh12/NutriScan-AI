@@ -136,7 +136,7 @@ export interface ManualEntryInput {
   foodName: string;
   portionEstimateG: number;
   mealType?: MealType;
-  source: "barcode" | "table";
+  source: "barcode" | "table" | "manual";
   nutrition?: {
     calories: number;
     proteinG: number;
@@ -150,7 +150,7 @@ export interface ManualEntryInput {
 export interface ManualEntryResponse {
   scan: Scan;
   nutrition: ScanNutrition;
-  source: "barcode" | "table";
+  source: "barcode" | "table" | "manual";
 }
 
 export interface InsightResponse {

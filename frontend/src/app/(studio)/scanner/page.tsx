@@ -12,6 +12,7 @@ const MODE_TABS = [
   { key: "upload", icon: "upload_file", label: "Upload foto" },
   { key: "barcode", icon: "barcode_scanner", label: "Barcode" },
   { key: "table", icon: "table_restaurant", label: "Cari makanan" },
+  { key: "manual", icon: "edit_note", label: "Input Manual" },
 ] as const;
 
 type ModeKey = (typeof MODE_TABS)[number]["key"];
@@ -74,6 +75,14 @@ export default function ScannerPage() {
   const [selectedFood, setSelectedFood] = useState<FoodDatasetEntry | null>(null);
   const [tablePortion, setTablePortion] = useState(100);
 
+  // --- Manual free-form entry (no scan, no dataset match — self-reported) ---
+  const [manualName, setManualName] = useState("");
+  const [manualPortion, setManualPortion] = useState(100);
+  const [manualCalories, setManualCalories] = useState("");
+  const [manualProtein, setManualProtein] = useState("");
+  const [manualCarbs, setManualCarbs] = useState("");
+  const [manualFat, setManualFat] = useState("");
+
   useEffect(() => {
     if (mode !== "table") return;
     const timer = setTimeout(() => {
@@ -118,6 +127,12 @@ export default function ScannerPage() {
     setBarcodeError(null);
     setBarcodeInput("");
     setSelectedFood(null);
+    setManualName("");
+    setManualPortion(100);
+    setManualCalories("");
+    setManualProtein("");
+    setManualCarbs("");
+    setManualFat("");
     setConfirmedMsg(null);
   }
 
@@ -270,6 +285,21 @@ export default function ScannerPage() {
           { foodName: selectedFood.name, portionEstimateG: tablePortion, source: "table" },
           token,
         );
+      } else if (mode === "manual" && manualName.trim() && manualCalories.trim() !== "") {
+        await submitManualEntry(
+          {
+            foodName: manualName.trim(),
+            portionEstimateG: manualPortion,
+            source: "manual",
+            nutrition: {
+              calories: Number(manualCalories) || 0,
+              proteinG: Number(manualProtein) || 0,
+              carbsG: Number(manualCarbs) || 0,
+              fatG: Number(manualFat) || 0,
+            },
+          },
+          token,
+        );
       } else {
         return;
       }
@@ -312,13 +342,25 @@ export default function ScannerPage() {
               portion: tablePortion,
               confidence: null,
             }
-          : null;
+          : mode === "manual" && manualName.trim() && manualCalories.trim() !== ""
+            ? {
+                name: manualName.trim(),
+                calories: Math.round(Number(manualCalories) || 0),
+                protein: Number(manualProtein) || 0,
+                carbs: Number(manualCarbs) || 0,
+                fat: Number(manualFat) || 0,
+                portion: manualPortion,
+                confidence: null,
+              }
+            : null;
 
   const macroTotal = detected ? detected.protein + detected.carbs + detected.fat || 1 : 1;
+  const isManualValid = manualName.trim() !== "" && manualCalories.trim() !== "" && Number(manualCalories) >= 0 && manualPortion > 0;
   const canLog =
     ((mode === "camera" || mode === "upload") && !!scanResult) ||
     (mode === "barcode" && !!barcodeProduct) ||
-    (mode === "table" && !!selectedFood);
+    (mode === "table" && !!selectedFood) ||
+    (mode === "manual" && isManualValid);
 
   return (
     <>
@@ -589,6 +631,90 @@ export default function ScannerPage() {
               </div>
             </div>
           )}
+
+          {mode === "manual" && (
+            <div className="animate-fade-up flex flex-1 flex-col gap-space-md p-space-lg">
+              <div className="flex flex-col items-center gap-space-sm text-center">
+                <span className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-slate-600 bg-slate-800">
+                  <Icon name="edit_note" className="text-[32px] text-rose-400" />
+                </span>
+                <div>
+                  <p className="font-title-lg text-title-lg font-semibold text-white">Input manual</p>
+                  <p className="mt-1 max-w-xs font-body-sm text-body-sm text-slate-400">
+                    Gak perlu scan — cocok buat makanan buatan sendiri atau yang gak ada di database. Kalori wajib diisi, kamu yang tentuin angkanya.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-space-sm">
+                <input
+                  type="text"
+                  placeholder="Nama makanan (mis. Nasi Rames buatan sendiri)"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-rose-500 focus:outline-none"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="font-label-sm text-[10px] uppercase tracking-wide text-slate-500">Porsi (gram)</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={manualPortion}
+                      onChange={(e) => setManualPortion(Math.max(1, Number(e.target.value)))}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-rose-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="font-label-sm text-[10px] uppercase tracking-wide text-slate-500">Kalori (kcal) *</span>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="mis. 350"
+                      value={manualCalories}
+                      onChange={(e) => setManualCalories(e.target.value)}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-rose-500 focus:outline-none"
+                    />
+                  </label>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="font-label-sm text-[10px] uppercase tracking-wide text-slate-500">Protein (g)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={manualProtein}
+                      onChange={(e) => setManualProtein(e.target.value)}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-rose-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="font-label-sm text-[10px] uppercase tracking-wide text-slate-500">Karbo (g)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={manualCarbs}
+                      onChange={(e) => setManualCarbs(e.target.value)}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-rose-500 focus:outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="font-label-sm text-[10px] uppercase tracking-wide text-slate-500">Lemak (g)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={manualFat}
+                      onChange={(e) => setManualFat(e.target.value)}
+                      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-rose-500 focus:outline-none"
+                    />
+                  </label>
+                </div>
+                <p className="font-label-sm text-[11px] text-slate-500">Protein/karbo/lemak boleh dikosongin, dianggap 0 kalau gak tau persisnya.</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: nutrition breakdown */}
@@ -601,6 +727,7 @@ export default function ScannerPage() {
                 {mode === "upload" && "Upload foto makanan buat lihat hasil di sini."}
                 {mode === "barcode" && "Scan atau cari barcode buat lihat hasil di sini."}
                 {mode === "table" && "Pilih makanan dari daftar buat lihat hasil di sini."}
+                {mode === "manual" && "Isi nama makanan dan kalorinya buat lihat hasil di sini."}
               </p>
             </div>
           ) : (
