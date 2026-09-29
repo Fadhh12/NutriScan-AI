@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confirmScanSchema, registerSchema, updateTargetSchema } from "../src/utils/validation";
+import { confirmScanSchema, manualEntrySchema, registerSchema, updateTargetSchema } from "../src/utils/validation";
 
 describe("registerSchema", () => {
   it("accepts a valid registration payload", () => {
@@ -58,5 +58,35 @@ describe("updateTargetSchema", () => {
 
   it("rejects values above 6000", () => {
     expect(updateTargetSchema.safeParse({ dailyCalorieTarget: 7000 }).success).toBe(false);
+  });
+});
+
+describe("manualEntrySchema", () => {
+  it("accepts a free-form manual entry with self-reported nutrition", () => {
+    const result = manualEntrySchema.safeParse({
+      foodName: "Rendang buatan sendiri",
+      portionEstimateG: 150,
+      source: "manual",
+      nutrition: { calories: 300, proteinG: 20, carbsG: 6, fatG: 20 },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts a manual entry without nutrition (backend estimates it)", () => {
+    const result = manualEntrySchema.safeParse({
+      foodName: "Makanan tidak dikenal",
+      portionEstimateG: 100,
+      source: "manual",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an unknown source", () => {
+    const result = manualEntrySchema.safeParse({
+      foodName: "Nasi Goreng",
+      portionEstimateG: 100,
+      source: "ai",
+    });
+    expect(result.success).toBe(false);
   });
 });

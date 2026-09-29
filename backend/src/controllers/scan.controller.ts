@@ -143,7 +143,7 @@ export async function manualEntry(req: Request, res: Response) {
     foodName: string;
     portionEstimateG: number;
     mealType?: MealType;
-    source: "barcode" | "table";
+    source: "barcode" | "table" | "manual";
     nutrition?: NutritionBreakdown;
   };
 

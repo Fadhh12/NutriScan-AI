@@ -49,7 +49,7 @@ export const manualEntrySchema = z.object({
   foodName: z.string().trim().min(1, "Food name is required"),
   portionEstimateG: z.number().positive("Portion must be a positive number"),
   mealType: mealTypeSchema.optional(),
-  source: z.enum(["barcode", "table"]),
+  source: z.enum(["barcode", "table", "manual"]),
   nutrition: z
     .object({
       calories: z.number().nonnegative(),
